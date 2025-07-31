@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GetQuote Login</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Login container -->
+  <div class="container" id="login-container">
+    <h1>GetQuote</h1>
+    <p class="description">Streamline your tendering process</p>
+
+    <div id="error-msg" class="error" style="display:none;"></div>
+
+    <input type="text" placeholder="Email" id="email" />
+    <input type="password" placeholder="Password" id="password" />
+    <button class="login" id="loginBtn">Login</button>
+    <button class="signup" id="signupBtn">Signup</button>
+    <a href="#" class="forgot" id="forgotPassword">Forgot Password?</a>
+  </div>
+
+  <!-- Authenticated user container -->
+  <div class="container authenticated-menu" id="authenticated-container" style="display:none;">
+    <h1>GetQuote</h1>
+    <p>
+      Welcome, <span id="user-name">John Doe</span>
+      <a href="#" id="logout-link" class="logout-link">Logout</a>
+    </p>
+
+    <div class="section tenders">
+      <h3>Tenders</h3>
+      <select id="tender-select">
+        <option>Tender #123: Office Building</option>
+        <option>Tender #124: School Renovation</option>
+      </select>
+      <button id="select-trades-btn" class="btn primary">Select Trades</button>
+    </div>
+
+    <div class="section subcontractors">
+      <h3>Sub contractors</h3>
+      <input type="file" accept=".csv" id="subcontractor-file" />
+      <div class="button-group">
+        <button id="import-subs-btn" class="btn success">Import Sub contractors</button>
+        <button id="find-subs-btn" class="btn primary">Find Sub contractors</button>
+      </div>
+      <div class="scrollable-list short">
+        <p>Plumbing: ABC Plumbing (Contacted)</p>
+        <p>Electrical: XYZ Electric (Pending)</p>
+      </div>
+    </div>
+
+    <div class="section quotes">
+      <h3>Quotes</h3>
+      <input type="text" placeholder="Filter by trade or name" id="quote-filter" />
+      <div class="scrollable-list tall">
+        <p>ABC Plumbing: $5,000 (Received)</p>
+        <p>XYZ Electric: $7,500 (Pending)</p>
+      </div>
+    </div>
+
+    <a href="#" id="settings-link" class="settings-link">Settings</a>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
