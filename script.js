@@ -13,7 +13,7 @@ const forgotPassword = document.getElementById("forgotPassword");
 const logoutLink = document.getElementById("logout-link");
 
 // Backend API URL
-const API_URL = "http://localhost:8000/api/login";  // adjust as needed
+const API_URL = "http://localhost:8000/supabase/login";  // adjust as needed
 
 // Helper to show error
 function showError(message) {
@@ -78,15 +78,54 @@ loginBtn.addEventListener("click", async () => {
   }
 });
 
-// Signup and Forgot Password handlers (simple alert placeholders)
-signupBtn.addEventListener("click", () => {
-  alert("Signup flow not implemented yet.");
+signupBtn.addEventListener("click", async () => {
+  clearError();
+  const email = emailInput.value.trim();
+  const password = passwordInput.value.trim();
+
+  if (!email || !password) {
+    showError("Please enter both Email and Password for signup.");
+    return;
+  }
+
+  signupBtn.disabled = true;
+  signupBtn.textContent = "Signing up...";
+
+  try {
+    const res = await fetch("http://localhost:8000/supabase/signup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      // Handle if user already exists or signup fails
+      if(data && data.detail) {
+        showError(data.detail);
+      } else {
+        showError("Signup failed. Try a different email.");
+      }
+      return;
+    }
+
+    // User created successfully
+    alert("Signup successful! Please check your email to verify your account.");
+    // Optionally, clear fields and switch to login view
+   // emailInput.value = "";
+    //passwordInput.value = "";
+
+  } catch (err) {
+    showError("Network or server error during signup.");
+  } finally {
+    signupBtn.disabled = false;
+    signupBtn.textContent = "Signup";
+  }
 });
 
-forgotPassword.addEventListener("click", (e) => {
-  e.preventDefault();
-  alert("Forgot password flow not implemented yet.");
-});
 
 // Logout resets UI and clears session
 logoutLink.addEventListener("click", (e) => {
@@ -96,7 +135,7 @@ logoutLink.addEventListener("click", (e) => {
   loginContainer.hidden = false;
   authContainer.hidden = true;
 
-  emailInput.value = "";
-  passwordInput.value = "";
+  //emailInput.value = "";
+  //passwordInput.value = "";
   clearError();
 });
