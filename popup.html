@@ -7,28 +7,24 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Login container -->
   <div class="container" id="login-container">
     <h1>GetQuote</h1>
     <p class="description">Streamline your tendering process</p>
-
-    <div id="error-msg" class="error" style="display:none;"></div>
-
-    <input type="text" placeholder="Email" id="email" />
-    <input type="password" placeholder="Password" id="password" />
+    <div id="error-msg" class="error" hidden></div>
+    <input type="text" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Password" />
     <button class="login" id="loginBtn">Login</button>
     <button class="signup" id="signupBtn">Signup</button>
     <a href="#" class="forgot" id="forgotPassword">Forgot Password?</a>
   </div>
 
-  <!-- Authenticated user container -->
-  <div class="container authenticated-menu" id="authenticated-container" style="display:none;">
+  <div class="container authenticated-menu" id="authenticated-container" hidden>
     <h1>GetQuote</h1>
     <p>
-      Welcome, <span id="user-name">John Doe</span>
+      Welcome, <span id="user-name">User</span>
       <a href="#" id="logout-link" class="logout-link">Logout</a>
     </p>
-
+    <!-- Authenticated user UI content here -->
     <div class="section tenders">
       <h3>Tenders</h3>
       <select id="tender-select">

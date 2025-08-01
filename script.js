@@ -1,75 +1,102 @@
-const loginBtn = document.getElementById('loginBtn');
-const signupBtn = document.getElementById('signupBtn');
-const forgotPassword = document.getElementById('forgotPassword');
-const errorMsg = document.getElementById('error-msg');
-const loginContainer = document.getElementById('login-container');
-const authContainer = document.getElementById('authenticated-container');
-const userNameSpan = document.getElementById('user-name');
-const logoutLink = document.getElementById('logout-link');
+// Cache UI elements
+const loginContainer = document.getElementById("login-container");
+const authContainer = document.getElementById("authenticated-container");
+const errorMsg = document.getElementById("error-msg");
 
-loginBtn.addEventListener('click', () => {
-  errorMsg.style.display = 'none';
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value.trim();
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const userNameSpan = document.getElementById("user-name");
+
+const loginBtn = document.getElementById("loginBtn");
+const signupBtn = document.getElementById("signupBtn");
+const forgotPassword = document.getElementById("forgotPassword");
+const logoutLink = document.getElementById("logout-link");
+
+// Backend API URL
+const API_URL = "http://localhost:8000/api/login";  // adjust as needed
+
+// Helper to show error
+function showError(message) {
+  errorMsg.textContent = message;
+  errorMsg.hidden = false;
+}
+
+// Helper to clear error
+function clearError() {
+  errorMsg.textContent = "";
+  errorMsg.hidden = true;
+}
+
+// Perform login
+loginBtn.addEventListener("click", async () => {
+  clearError();
+  const email = emailInput.value.trim();
+  const password = passwordInput.value.trim();
 
   if (!email || !password) {
-    errorMsg.textContent = 'Please enter both Email and Password.';
-    errorMsg.style.display = 'block';
+    showError("Please enter both Email and Password.");
     return;
   }
 
   loginBtn.disabled = true;
-  loginBtn.textContent = 'Logging in...';
+  loginBtn.textContent = "Logging in...";
 
-  fetch('http://localhost:8000/api/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-    .then(response => {
-      if (!response.ok) throw new Error('Invalid credentials or server error');
-      return response.json();
-    })
-    .then(data => {
-      if (data.authenticated) {
-        // Optionally set user name if provided by backend, fallback to email
-        if (data.name) userNameSpan.textContent = data.name;
-        else userNameSpan.textContent = email;
-
-        loginContainer.style.display = 'none';
-        authContainer.style.display = 'block';
-      } else {
-        errorMsg.textContent = 'Authentication failed. Please check your details.';
-        errorMsg.style.display = 'block';
-      }
-    })
-    .catch(err => {
-      errorMsg.textContent = 'Error: ' + err.message;
-      errorMsg.style.display = 'block';
-    })
-    .finally(() => {
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'Login';
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
     });
+
+    if (!res.ok) {
+      throw new Error("Invalid credentials or server error");
+    }
+
+    const data = await res.json();
+
+    if (data.authenticated) {
+      // Store tokens and user id in sessionStorage/localStorage as appropriate
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("refresh_token", data.refresh_token);
+      sessionStorage.setItem("user_uid", data.user.id);
+
+      userNameSpan.textContent = data.user.user_metadata.name || data.user.email.split("@")[0];
+
+      // Show authenticated UI, hide login UI
+      loginContainer.hidden = true;
+      authContainer.hidden = false;
+    } else {
+      showError("Authentication failed.");
+    }
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.textContent = "Login";
+  }
 });
 
-signupBtn.addEventListener('click', () => {
-  alert('Redirecting to signup page (not implemented)');
+// Signup and Forgot Password handlers (simple alert placeholders)
+signupBtn.addEventListener("click", () => {
+  alert("Signup flow not implemented yet.");
 });
 
-forgotPassword.addEventListener('click', e => {
+forgotPassword.addEventListener("click", (e) => {
   e.preventDefault();
-  alert('Forgot password flow (not implemented)');
+  alert("Forgot password flow not implemented yet.");
 });
 
-// Logout: simple reset UI (for demo purposes)
-logoutLink.addEventListener('click', e => {
+// Logout resets UI and clears session
+logoutLink.addEventListener("click", (e) => {
   e.preventDefault();
-  // Clear any session or tokens here if you have them
-  authContainer.style.display = 'none';
-  loginContainer.style.display = 'block';
-  errorMsg.style.display = 'none';
-  userNameSpan.textContent = 'John Doe';
-  document.getElementById('email').value = '';
-  document.getElementById('password').value = '';
+  localStorage.clear();
+  sessionStorage.clear();
+  loginContainer.hidden = false;
+  authContainer.hidden = true;
+
+  emailInput.value = "";
+  passwordInput.value = "";
+  clearError();
 });
