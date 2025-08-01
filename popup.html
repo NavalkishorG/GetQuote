@@ -28,6 +28,12 @@
       <a href="#" id="logout-link" class="logout-link">Logout</a>
     </p>
 
+    <button id="uploadContractorsBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+      Upload Contractors data.
+    </button>
+
+
+
     <div class="p-4 space-y-4 w-80 text-sm font-sans">
       <button id="scanTenderBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
         Scan Tender Page
@@ -35,7 +41,7 @@
     
       <div id="tradeSelector" class="hidden space-y-2">
         <label class="textsm-gray-600 text-xs">Found These Tenders:</label><br><br>
-        <label class="textsm-gray-600 text-xs">Select Tender for Matching</label>
+        <label class="textsm-gray-600 text-xs">Select Tender for Matching Sub Contractors</label>
         <select id="tenderSelector" class="w-full bg-gray-100 text-gray-600 py-2 rounded-lg hover:bg-gray-200">
           <option value="">Select Tender</option>
           <option value="tender1">Tender 1</option>
@@ -43,12 +49,12 @@
           <option value="tender3">Tender 3</option>
         </select> <br><br>
 
-        <button id="submitTenderBtn" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
-          Submit for Matching
+        <button id="searchBtn" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+          Search Matching Sub Contractors
         </button>
       </div>
 
-      
+
     
       <div id="status" class="text-gray-600 text-xs"></div>
     </div>
