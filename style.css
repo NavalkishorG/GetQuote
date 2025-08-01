@@ -46,7 +46,8 @@ body {
   width: 100%;
   max-width: 420px;
   max-height: 480px;      /* Limit max popup height */
-  padding: 28px 36px;
+  padding: 0px 36px;     /* Remove padding (y,x) */
+  padding-bottom: 28px;
   box-sizing: border-box;
   text-align: center;
   overflow-y: auto;       /* Enable vertical scrolling */
