@@ -255,6 +255,36 @@ signupBtn.addEventListener("click", async () => {
   }
 });
 
+// Event Listener: Scan Tender Page Button
+const scanTenderBtn = document.getElementById("scanTenderBtn");
+const currentUrlContainer = document.getElementById("currentUrlContainer");
+const currentPageUrl = document.getElementById("currentPageUrl");
+
+if (scanTenderBtn) {
+  scanTenderBtn.addEventListener("click", async () => {
+    try {
+      // Get the current active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      if (tab && tab.url) {
+        // Display the URL in the popup
+        currentPageUrl.textContent = tab.url;
+        currentUrlContainer.classList.remove("hidden");
+        
+        // You can add additional logic here to process the tender page
+        console.log("Current page URL:", tab.url);
+      } else {
+        currentPageUrl.textContent = "Could not retrieve the current page URL.";
+        currentUrlContainer.classList.remove("hidden");
+      }
+    } catch (error) {
+      console.error("Error getting current tab:", error);
+      currentPageUrl.textContent = "Error: " + error.message;
+      currentUrlContainer.classList.remove("hidden");
+    }
+  });
+}
+
 // Event Listener: Logout
 logoutLink.addEventListener("click", async (e) => {
   e.preventDefault();
