@@ -260,9 +260,38 @@ const scanTenderBtn = document.getElementById("scanTenderBtn");
 const currentUrlContainer = document.getElementById("currentUrlContainer");
 const currentPageUrl = document.getElementById("currentPageUrl");
 
+// Function to send URL to backend
+async function sendUrlToBackend(url) {
+  try {
+    const response = await fetch('http://localhost:8000/tender/scrape-tenders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url: url })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to process URL');
+    }
+
+    const data = await response.json();
+    console.log('Backend response:', data);
+    return data;
+  } catch (error) {
+    console.error('Error sending URL to backend:', error);
+    throw error;
+  }
+}
+
 if (scanTenderBtn) {
   scanTenderBtn.addEventListener("click", async () => {
     try {
+      // Show loading state
+      scanTenderBtn.disabled = true;
+      scanTenderBtn.textContent = "Scanning...";
+      
       // Get the current active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
@@ -271,8 +300,20 @@ if (scanTenderBtn) {
         currentPageUrl.textContent = tab.url;
         currentUrlContainer.classList.remove("hidden");
         
-        // You can add additional logic here to process the tender page
-        console.log("Current page URL:", tab.url);
+        // Send URL to backend
+        try {
+          const result = await sendUrlToBackend(tab.url);
+          console.log("Tender data received:", result);
+          // You can process the result here as needed
+          // For example, display a success message or update the UI with the received data
+        } catch (error) {
+          console.error("Error processing tender:", error);
+          // Display error to user
+          const errorMessage = document.createElement('div');
+          errorMessage.className = 'mt-2 text-red-500 text-sm';
+          errorMessage.textContent = 'Error: ' + (error.message || 'Failed to process tender');
+          currentUrlContainer.appendChild(errorMessage);
+        }
       } else {
         currentPageUrl.textContent = "Could not retrieve the current page URL.";
         currentUrlContainer.classList.remove("hidden");
@@ -281,6 +322,10 @@ if (scanTenderBtn) {
       console.error("Error getting current tab:", error);
       currentPageUrl.textContent = "Error: " + error.message;
       currentUrlContainer.classList.remove("hidden");
+    } finally {
+      // Reset button state
+      scanTenderBtn.disabled = false;
+      scanTenderBtn.textContent = "Scan Tender Page";
     }
   });
 }
