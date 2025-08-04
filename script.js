@@ -263,7 +263,7 @@ const currentPageUrl = document.getElementById("currentPageUrl");
 // Function to send URL to backend
 async function sendUrlToBackend(url) {
   try {
-    const response = await fetch('http://localhost:8000/tender/scrape-tenders', {
+    const response = await fetch('http://localhost:8000/scrapper/scrape-tenders', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
