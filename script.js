@@ -13,8 +13,8 @@ const forgotPassword = document.getElementById("forgotPassword");
 const logoutLink = document.getElementById("logout-link");
 
 // Backend API URLs – set as per your backend
-const LOGIN_API_URL = "http://localhost:8000/supabase/login";
-const SIGNUP_API_URL = "http://localhost:8000/supabase/signup";
+const LOGIN_API_URL = `${API_BASE_URL}/supabase/login`;
+const SIGNUP_API_URL = `${API_BASE_URL}/supabase/signup`;
 
 // Show error message helper
 function showError(message) {
@@ -135,15 +135,15 @@ if (document.readyState === "loading") {
 const checkLegacyAuth = async () => {
   const accessToken = localStorage.getItem("access_token");
   const userId = localStorage.getItem("user_uid");
-
   if (accessToken && userId) {
     try {
-      const res = await fetch("http://localhost:8000/supabase/me", {
+      const res = await fetch(`${API_BASE_URL}/supabase/me`, {
         headers: {
+          ...getRequestHeaders(),
           Authorization: `Bearer ${accessToken}`,
         },
       });
-
+      
       if (res.ok) {
         const data = await res.json();
         if (data?.user) {
@@ -171,7 +171,7 @@ loginBtn.addEventListener("click", async () => {
   clearError();
   const email = emailInput.value.trim();
   const password = passwordInput.value.trim();
-
+  
   if (!email || !password) {
     showError("Please enter both Email and Password.");
     return;
@@ -179,11 +179,11 @@ loginBtn.addEventListener("click", async () => {
 
   loginBtn.disabled = true;
   loginBtn.textContent = "Logging in...";
-
+  
   try {
     const res = await fetch(LOGIN_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getRequestHeaders(),
       body: JSON.stringify({ email, password }),
     });
 
@@ -194,20 +194,22 @@ loginBtn.addEventListener("click", async () => {
     }
 
     const data = await res.json();
-
+    console.log("Login response:", data); // Debug log
+    
     if (data.authenticated) {
       await sessionStorage.set({
         isLoggedIn: true,
         user: data.user,
         accessToken: data.access_token,
-        expiresAt: Date.now() + data.expires_in * 1000,
+        expiresAt: Date.now() + (data.expires_in * 1000),
       });
-
       showAuthenticatedUI(data.user);
     } else {
       showError("Authentication failed.");
     }
+
   } catch (error) {
+    console.error("Login error:", error);
     showError(error.message || "Network error during login.");
   } finally {
     loginBtn.disabled = false;
@@ -215,12 +217,14 @@ loginBtn.addEventListener("click", async () => {
   }
 });
 
+
+
 // Event Listener: Signup
 signupBtn.addEventListener("click", async () => {
   clearError();
   const email = emailInput.value.trim();
   const password = passwordInput.value.trim();
-
+  
   if (!email || !password) {
     showError("Please enter both Email and Password for signup.");
     return;
@@ -228,32 +232,34 @@ signupBtn.addEventListener("click", async () => {
 
   signupBtn.disabled = true;
   signupBtn.textContent = "Signing up...";
-
+  
   try {
     const res = await fetch(SIGNUP_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getRequestHeaders(),
       body: JSON.stringify({ email, password }),
     });
 
     const data = await res.json();
-
+    
     if (!res.ok) {
       showError(data?.detail || "Signup failed. Try a different email.");
       return;
     }
 
     alert("Signup successful! Please check your email to verify your account.");
-
     emailInput.value = "";
     passwordInput.value = "";
+    
   } catch (error) {
+    console.error("Signup error:", error);
     showError(error.message || "Network or server error during signup.");
   } finally {
     signupBtn.disabled = false;
     signupBtn.textContent = "Signup";
   }
 });
+
 
 // Event Listener: Scan Tender Page Button
 const scanTenderBtn = document.getElementById("scanTenderBtn");
@@ -263,14 +269,12 @@ const currentPageUrl = document.getElementById("currentPageUrl");
 // Function to send URL to backend
 async function sendUrlToBackend(url) {
   try {
-    const response = await fetch('http://localhost:8000/scrapper/scrape-tenders', {
+    const response = await fetch(`${API_BASE_URL}/scrapper/scrape-tenders`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getRequestHeaders(),
       body: JSON.stringify({ url: url })
     });
-
+    
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.detail || 'Failed to process URL');

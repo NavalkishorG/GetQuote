@@ -9,7 +9,9 @@
     "tabs"
   ],
   "host_permissions": [
-    "http://localhost:8000/*"
+    "http://localhost:8000/*",
+    "https://*.ngrok-free.app/*",
+    "https://*.getquote1.netlify.app/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -20,7 +22,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["popup.html"],
+      "resources": ["popup.html", "config.js"],
       "matches": ["<all_urls>"]
     }
   ],
