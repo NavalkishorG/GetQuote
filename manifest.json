@@ -10,12 +10,15 @@
   ],
   "host_permissions": [
     "http://localhost:8000/*",
-    "https://*.ngrok-free.app/*",
-    "https://*.getquote1.netlify.app/*"
+    "https://*.ngrok-free.app/*"
   ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "getquote-private-test@example.com"
+    }
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

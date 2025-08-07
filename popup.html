@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GetQuote Extension</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GetQuote</title>
     <link rel="stylesheet" href="style.css">
     <script src="config.js"></script>
 </head>
@@ -12,56 +13,157 @@
             <!-- Login Form -->
             <div id="login-form" style="display: none;">
                 <h1 class="popup-heading">GetQuote</h1>
-                <p class="description">Use your EstimateOne credentials</p>
-                
+                <p class="description">Sign in to your account</p>
                 <div id="error-message" class="error" style="display: none;"></div>
-                
-                <input type="text" id="login-email" placeholder="EstimateOne Email" autocomplete="email" value="">
-                <input type="password" id="login-password" placeholder="EstimateOne Password" autocomplete="current-password" value="">
-                
-                <button class="login" id="login-btn">Login</button>
-                <button class="signup" id="show-signup-btn">New User? Sign Up</button>
-                
-                <a class="forgot" id="forgot-password">Forgot Password?</a>
+                <input type="text" id="login-email" placeholder="Email" autocomplete="email">
+                <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+                <button id="login-btn" class="login">Sign In</button>
+                <button id="show-signup-btn" class="signup">Create Account</button>
+                <a href="#" id="forgot-password" class="forgot">Forgot Password?</a>
             </div>
 
             <!-- Signup Form -->
             <div id="signup-form" style="display: none;">
-                <h1 class="popup-heading">Create Account</h1>
-                <p class="description">Use your EstimateOne credentials</p>
-                
+                <h1 class="popup-heading">GetQuote</h1>
+                <p class="description">Create your account</p>
                 <div id="signup-error-message" class="error" style="display: none;"></div>
-                
-                <input type="text" id="signup-email" placeholder="EstimateOne Email" autocomplete="email" value="">
-                <input type="password" id="signup-password" placeholder="EstimateOne Password" autocomplete="new-password" value="">
-                
-                <button class="signup" id="signup-btn">Create Account</button>
-                <button class="login" id="show-login-btn">Already have account? Login</button>
+                <input type="text" id="signup-email" placeholder="Email" autocomplete="email">
+                <input type="password" id="signup-password" placeholder="Password" autocomplete="new-password">
+                <button id="signup-btn" class="signup">Create Account</button>
+                <button id="show-login-btn" class="login">Back to Sign In</button>
             </div>
 
             <!-- Authenticated UI -->
             <div id="authenticated-ui" style="display: none;">
-                <h1 class="popup-heading">Welcome!</h1>
-                <p class="description">Ready to scrape EstimateOne tenders</p>
-                
-                <!-- Credential Status Display -->
+                <h1 class="popup-heading">Welcome back!</h1>
                 <div id="credential-status" class="credential-status">
-                    <span id="credential-status-text">Checking credential status...</span>
+                    <span id="credential-status-text">Checking credentials...</span>
                 </div>
-                
-                <div id="scrape-error-message" class="error" style="display: none;"></div>
                 <div id="scrape-success-message" class="success" style="display: none;"></div>
+                <div id="scrape-error-message" class="error" style="display: none;"></div>
                 
-                <button class="scrape-btn" id="scrape-tenders-btn">Scan Current Page</button>
-                <button class="check-btn" id="check-credentials-btn">Check Credentials</button>
-                <button class="logout-btn" id="logout-btn">Logout</button>
+                <button id="view-dashboard-btn" class="dashboard-btn">📊 View Dashboard</button>
+                <button id="scrape-tenders-btn" class="scrape-btn">🔍 Scrape Tenders</button>
+                <button id="detect-project-id-btn" class="check-btn">🔍 Detect Project ID</button>
+                <button id="check-credentials-btn" class="check-btn">✓ Check Credentials</button>
+                <button id="logout-btn" class="logout-btn">Sign Out</button>
             </div>
 
             <!-- Loading State -->
             <div id="loading" style="display: none;">
-                <h1 class="popup-heading">Processing...</h1>
-                <p class="description">Please wait while we process your request</p>
+                <h1 class="popup-heading">GetQuote</h1>
+                <p class="description">Please wait...</p>
                 <div class="loading-spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Modal -->
+    <div id="dashboard-modal" class="dashboard-modal" style="display: none;">
+        <div class="dashboard-overlay"></div>
+        <div class="dashboard-content">
+            <div class="dashboard-header">
+                <h2>GetQuote Analytics Dashboard</h2>
+                <button id="close-dashboard" class="close-btn">&times;</button>
+            </div>
+            <div class="dashboard-body">
+                <!-- Dashboard content remains the same as your original -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">247</div>
+                        <div class="stat-label">Total Tenders</div>
+                        <div class="stat-change positive">+12% this month</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">$2.4M</div>
+                        <div class="stat-label">Total Value</div>
+                        <div class="stat-change positive">+8.5% this month</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">18</div>
+                        <div class="stat-label">Won Bids</div>
+                        <div class="stat-change positive">+3 this week</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">73%</div>
+                        <div class="stat-label">Success Rate</div>
+                        <div class="stat-change negative">-2% this month</div>
+                    </div>
+                </div>
+                
+                <div class="charts-section">
+                    <div class="chart-card">
+                        <h3>Monthly Tender Activity</h3>
+                        <div class="chart-placeholder">
+                            <div class="bar-chart">
+                                <div class="bar" style="height: 60%;"></div>
+                                <div class="bar" style="height: 80%;"></div>
+                                <div class="bar" style="height: 45%;"></div>
+                                <div class="bar" style="height: 90%;"></div>
+                                <div class="bar" style="height: 75%;"></div>
+                                <div class="bar" style="height: 65%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Bid Categories</h3>
+                        <div class="chart-placeholder">
+                            <div class="pie-chart"></div>
+                            <div class="pie-legend">
+                                <div class="legend-item">
+                                    <div class="legend-color color-1"></div>
+                                    <span>Construction (45%)</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color color-2"></div>
+                                    <span>IT Services (25%)</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color color-3"></div>
+                                    <span>Consulting (20%)</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color color-4"></div>
+                                    <span>Others (10%)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recent-activity">
+                    <h3>Recent Tender Activity</h3>
+                    <div class="activity-list">
+                        <div class="activity-item">
+                            <div class="activity-icon">🏗️</div>
+                            <div class="activity-content">
+                                <div class="activity-title">Bridge Construction Project</div>
+                                <div class="activity-meta">Value: $850,000 • Status: Pending • 2 hours ago</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">💻</div>
+                            <div class="activity-content">
+                                <div class="activity-title">Software Development Contract</div>
+                                <div class="activity-meta">Value: $120,000 • Status: Won • 1 day ago</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">🏢</div>
+                            <div class="activity-content">
+                                <div class="activity-title">Office Renovation Tender</div>
+                                <div class="activity-meta">Value: $75,000 • Status: Submitted • 3 days ago</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">🚚</div>
+                            <div class="activity-content">
+                                <div class="activity-title">Logistics Services RFP</div>
+                                <div class="activity-meta">Value: $200,000 • Status: Lost • 1 week ago</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
