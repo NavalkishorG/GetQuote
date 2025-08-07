@@ -1,72 +1,71 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GetQuote Login</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <title>GetQuote Extension</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
 </head>
 <body>
-  <div class="container" id="login-container">
-    <h1>GetQuote</h1>
-    <p class="description">Streamline your tendering process</p>
-    <div id="error-msg" class="error" hidden></div>
-    <input type="text" id="email" placeholder="Email" />
-    <input type="password" id="password" placeholder="Password" />
-    <button class="login" id="loginBtn">Login</button>
-    <button class="signup" id="signupBtn">Signup</button>
-    <a href="#" class="forgot" id="forgotPassword">Forgot Password?</a>
-  </div>
+    <div class="popup-wrapper">
+        <div class="scroll-container">
+            <!-- Login Form -->
+            <div id="login-form" style="display: none;">
+                <h1 class="popup-heading">GetQuote</h1>
+                <p class="description">Use your EstimateOne credentials</p>
+                
+                <div id="error-message" class="error" style="display: none;"></div>
+                
+                <input type="text" id="login-email" placeholder="EstimateOne Email" autocomplete="email" value="">
+                <input type="password" id="login-password" placeholder="EstimateOne Password" autocomplete="current-password" value="">
+                
+                <button class="login" id="login-btn">Login</button>
+                <button class="signup" id="show-signup-btn">New User? Sign Up</button>
+                
+                <a class="forgot" id="forgot-password">Forgot Password?</a>
+            </div>
 
+            <!-- Signup Form -->
+            <div id="signup-form" style="display: none;">
+                <h1 class="popup-heading">Create Account</h1>
+                <p class="description">Use your EstimateOne credentials</p>
+                
+                <div id="signup-error-message" class="error" style="display: none;"></div>
+                
+                <input type="text" id="signup-email" placeholder="EstimateOne Email" autocomplete="email" value="">
+                <input type="password" id="signup-password" placeholder="EstimateOne Password" autocomplete="new-password" value="">
+                
+                <button class="signup" id="signup-btn">Create Account</button>
+                <button class="login" id="show-login-btn">Already have account? Login</button>
+            </div>
 
+            <!-- Authenticated UI -->
+            <div id="authenticated-ui" style="display: none;">
+                <h1 class="popup-heading">Welcome!</h1>
+                <p class="description">Ready to scrape EstimateOne tenders</p>
+                
+                <!-- Credential Status Display -->
+                <div id="credential-status" class="credential-status">
+                    <span id="credential-status-text">Checking credential status...</span>
+                </div>
+                
+                <div id="scrape-error-message" class="error" style="display: none;"></div>
+                <div id="scrape-success-message" class="success" style="display: none;"></div>
+                
+                <button class="scrape-btn" id="scrape-tenders-btn">Scan Current Page</button>
+                <button class="check-btn" id="check-credentials-btn">Check Credentials</button>
+                <button class="logout-btn" id="logout-btn">Logout</button>
+            </div>
 
-   <!-- Authenticated user UI content here -->
-  <div class="container authenticated-menu" id="authenticated-container" hidden>
-    <h1>GetQuote</h1>
-    <p>
-      Welcome, <span id="user-name">User</span>
-      <a href="#" id="logout-link" class="logout-link">Logout</a>
-    </p>
-
-    <button id="uploadContractorsBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-      Upload Contractors data.
-    </button>
-
-
-
-    <div class="p-4 space-y-4 w-80 text-sm font-sans">
-      <button id="scanTenderBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-        Scan Tender Page
-      </button>
-      <div id="currentUrlContainer" class="mt-2 p-2 bg-gray-100 rounded text-sm text-gray-700 break-words hidden">
-        <span class="font-semibold">Current Page:</span>
-        <span id="currentPageUrl"></span>
-      </div>
-    
-      <div id="tradeSelector" class="hidden space-y-2">
-        <label class="textsm-gray-600 text-xs">Found These Tenders:</label><br><br>
-        <label class="textsm-gray-600 text-xs">Select Tender for Matching Sub Contractors</label>
-        <select id="tenderSelector" class="w-full bg-gray-100 text-gray-600 py-2 rounded-lg hover:bg-gray-200">
-          <option value="">Select Tender</option>
-          <option value="tender1">Tender 1</option>
-          <option value="tender2">Tender 2</option>
-          <option value="tender3">Tender 3</option>
-        </select> <br><br>
-
-        <button id="searchBtn" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
-          Search Matching Sub Contractors
-        </button>
-      </div>
-
-
-    
-      <div id="status" class="text-gray-600 text-xs"></div>
+            <!-- Loading State -->
+            <div id="loading" style="display: none;">
+                <h1 class="popup-heading">Processing...</h1>
+                <p class="description">Please wait while we process your request</p>
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
     </div>
-    
-    <a href="#" id="settings-link" class="settings-link">Settings</a>
-  </div>
 
-  <script src="config.js"></script>
-  <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

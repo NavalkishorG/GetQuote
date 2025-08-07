@@ -1,360 +1,450 @@
-// Cache UI elements
-const loginContainer = document.getElementById("login-container");
-const authContainer = document.getElementById("authenticated-container");
-const errorMsg = document.getElementById("error-msg");
-
-const emailInput = document.getElementById("email");
-const passwordInput = document.getElementById("password");
-const userNameSpan = document.getElementById("user-name");
-
-const loginBtn = document.getElementById("loginBtn");
-const signupBtn = document.getElementById("signupBtn");
-const forgotPassword = document.getElementById("forgotPassword");
-const logoutLink = document.getElementById("logout-link");
-
-// Backend API URLs – set as per your backend
-const LOGIN_API_URL = `${API_BASE_URL}/supabase/login`;
-const SIGNUP_API_URL = `${API_BASE_URL}/supabase/signup`;
-
-// Show error message helper
-function showError(message) {
-  errorMsg.textContent = message;
-  errorMsg.hidden = false;
-  console.warn("Show Error:", message);
-}
-
-// Clear error message helper
-function clearError() {
-  errorMsg.textContent = "";
-  errorMsg.hidden = true;
-}
-
-// Show login UI, hide authenticated UI
-function showLoginUI() {
-  loginContainer.hidden = false;
-  authContainer.hidden = true;
-  clearError();
-  console.log("Showing login UI");
-}
-
-// Show authenticated UI, hide login UI
-async function showAuthenticatedUI(user) {
-  const displayName = user?.user_metadata?.name || (user?.email ? user.email.split("@")[0] : "User");
-  userNameSpan.textContent = displayName;
-  loginContainer.hidden = true;
-  authContainer.hidden = false;
-  clearError();
-  console.log("Showing authenticated UI for user:", displayName);
-
-  try {
-    await sessionStorage.set({
-      isLoggedIn: true,
-      user: user,
-      accessToken: user.access_token || user.accessToken,
-      expiresAt: Date.now() + ((user.expires_in || 3600) * 1000),
-    });
-  } catch (error) {
-    console.error("Error saving session:", error);
-  }
-}
-
-// Session storage functions supporting Chrome extension and fallback for testing
-const sessionStorage = {
-  async set(data) {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
-      return new Promise((resolve) => {
-        chrome.storage.session.set(data, resolve);
-      });
-    } else {
-      for (const [key, value] of Object.entries(data)) {
-        window.sessionStorage.setItem(key, JSON.stringify(value));
-      }
-    }
-  },
-
-  async get(keys) {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
-      return new Promise((resolve) => {
-        chrome.storage.session.get(keys, (result) => {
-          resolve(result);
-        });
-      });
-    } else {
-      const result = {};
-      for (const key of keys) {
-        const value = window.sessionStorage.getItem(key);
-        if (value) result[key] = JSON.parse(value);
-      }
-      return result;
-    }
-  },
-
-  async remove(keys) {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
-      return new Promise((resolve) => {
-        chrome.storage.session.remove(keys, resolve);
-      });
-    } else {
-      for (const key of keys) {
-        window.sessionStorage.removeItem(key);
-      }
-    }
-  },
-};
-
-// On popup load, check for existing session
-const init = async () => {
-  try {
-    const result = await sessionStorage.get(["isLoggedIn", "user", "expiresAt"]);
-    console.log("Session check result:", result);
-
-    if (result && result.isLoggedIn && result.user && result.expiresAt > Date.now()) {
-      showAuthenticatedUI(result.user);
-      return;
-    }
-
-    if (result && (result.expiresAt <= Date.now() || !result.user)) {
-      await sessionStorage.remove(["isLoggedIn", "user", "accessToken", "expiresAt"]);
-    }
-
-    showLoginUI();
-  } catch (error) {
-    console.error("Error initializing extension:", error);
-    showLoginUI();
-  }
-};
-
-// Start the extension
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
-} else {
-  init();
-}
-
-// Legacy localStorage token check (optional)
-const checkLegacyAuth = async () => {
-  const accessToken = localStorage.getItem("access_token");
-  const userId = localStorage.getItem("user_uid");
-  if (accessToken && userId) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/supabase/me`, {
-        headers: {
-          ...getRequestHeaders(),
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.user) {
-          showAuthenticatedUI(data.user);
-          return;
-        }
-      }
-      localStorage.clear();
-      showLoginUI();
-    } catch (e) {
-      console.error("Error verifying token:", e);
-      showLoginUI();
-    }
-  } else {
-    showLoginUI();
-  }
-};
-
-if (window.location.href.includes("popup.html")) {
-  checkLegacyAuth();
-}
-
-// Event Listener: Login
-loginBtn.addEventListener("click", async () => {
-  clearError();
-  const email = emailInput.value.trim();
-  const password = passwordInput.value.trim();
-  
-  if (!email || !password) {
-    showError("Please enter both Email and Password.");
-    return;
-  }
-
-  loginBtn.disabled = true;
-  loginBtn.textContent = "Logging in...";
-  
-  try {
-    const res = await fetch(LOGIN_API_URL, {
-      method: "POST",
-      headers: getRequestHeaders(),
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      showError(`Login failed: ${errText || "Invalid credentials or server error"}`);
-      return;
-    }
-
-    const data = await res.json();
-    console.log("Login response:", data); // Debug log
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('Extension popup loaded');
     
-    if (data.authenticated) {
-      await sessionStorage.set({
-        isLoggedIn: true,
-        user: data.user,
-        accessToken: data.access_token,
-        expiresAt: Date.now() + (data.expires_in * 1000),
-      });
-      showAuthenticatedUI(data.user);
-    } else {
-      showError("Authentication failed.");
-    }
-
-  } catch (error) {
-    console.error("Login error:", error);
-    showError(error.message || "Network error during login.");
-  } finally {
-    loginBtn.disabled = false;
-    loginBtn.textContent = "Login";
-  }
-});
-
-
-
-// Event Listener: Signup
-signupBtn.addEventListener("click", async () => {
-  clearError();
-  const email = emailInput.value.trim();
-  const password = passwordInput.value.trim();
-  
-  if (!email || !password) {
-    showError("Please enter both Email and Password for signup.");
-    return;
-  }
-
-  signupBtn.disabled = true;
-  signupBtn.textContent = "Signing up...";
-  
-  try {
-    const res = await fetch(SIGNUP_API_URL, {
-      method: "POST",
-      headers: getRequestHeaders(),
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await res.json();
+    // Check if user is already authenticated
+    const token = await getStoredToken();
+    console.log('Stored token exists:', !!token);
     
-    if (!res.ok) {
-      showError(data?.detail || "Signup failed. Try a different email.");
-      return;
-    }
-
-    alert("Signup successful! Please check your email to verify your account.");
-    emailInput.value = "";
-    passwordInput.value = "";
-    
-  } catch (error) {
-    console.error("Signup error:", error);
-    showError(error.message || "Network or server error during signup.");
-  } finally {
-    signupBtn.disabled = false;
-    signupBtn.textContent = "Signup";
-  }
-});
-
-
-// Event Listener: Scan Tender Page Button
-const scanTenderBtn = document.getElementById("scanTenderBtn");
-const currentUrlContainer = document.getElementById("currentUrlContainer");
-const currentPageUrl = document.getElementById("currentPageUrl");
-
-// Function to send URL to backend
-async function sendUrlToBackend(url) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/scrapper/scrape-tenders`, {
-      method: 'POST',
-      headers: getRequestHeaders(),
-      body: JSON.stringify({ url: url })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to process URL');
-    }
-
-    const data = await response.json();
-    console.log('Backend response:', data);
-    return data;
-  } catch (error) {
-    console.error('Error sending URL to backend:', error);
-    throw error;
-  }
-}
-
-if (scanTenderBtn) {
-  scanTenderBtn.addEventListener("click", async () => {
-    try {
-      // Show loading state
-      scanTenderBtn.disabled = true;
-      scanTenderBtn.textContent = "Scanning...";
-      
-      // Get the current active tab
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
-      if (tab && tab.url) {
-        // Display the URL in the popup
-        currentPageUrl.textContent = tab.url;
-        currentUrlContainer.classList.remove("hidden");
-        
-        // Send URL to backend
+    if (token) {
         try {
-          const result = await sendUrlToBackend(tab.url);
-          console.log("Tender data received:", result);
-          // You can process the result here as needed
-          // For example, display a success message or update the UI with the received data
+            const user = await verifyToken(token);
+            if (user) {
+                console.log('User verified:', user.email);
+                showAuthenticatedUI(user);
+                return;
+            }
         } catch (error) {
-          console.error("Error processing tender:", error);
-          // Display error to user
-          const errorMessage = document.createElement('div');
-          errorMessage.className = 'mt-2 text-red-500 text-sm';
-          errorMessage.textContent = 'Error: ' + (error.message || 'Failed to process tender');
-          currentUrlContainer.appendChild(errorMessage);
+            console.log('Token verification failed:', error);
+            await clearStoredToken();
         }
-      } else {
-        currentPageUrl.textContent = "Could not retrieve the current page URL.";
-        currentUrlContainer.classList.remove("hidden");
-      }
-    } catch (error) {
-      console.error("Error getting current tab:", error);
-      currentPageUrl.textContent = "Error: " + error.message;
-      currentUrlContainer.classList.remove("hidden");
-    } finally {
-      // Reset button state
-      scanTenderBtn.disabled = false;
-      scanTenderBtn.textContent = "Scan Tender Page";
     }
-  });
+    
+    // Show login form if no valid token
+    showLoginForm();
+    setupEventListeners();
+});
+
+// Event Listeners
+function setupEventListeners() {
+    // Login Form
+    document.getElementById('login-btn').addEventListener('click', handleLogin);
+    document.getElementById('show-signup-btn').addEventListener('click', showSignupForm);
+    document.getElementById('login-email').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+    document.getElementById('login-password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+
+    // Signup Form
+    document.getElementById('signup-btn').addEventListener('click', handleSignup);
+    document.getElementById('show-login-btn').addEventListener('click', showLoginForm);
+    document.getElementById('signup-email').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSignup();
+    });
+    document.getElementById('signup-password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSignup();
+    });
+
+    // Authenticated UI
+    document.getElementById('logout-btn').addEventListener('click', handleLogout);
+    document.getElementById('scrape-tenders-btn').addEventListener('click', handleScrapeTenders);
+    document.getElementById('check-credentials-btn').addEventListener('click', handleCheckCredentials);
+
+    // Forgot Password
+    document.getElementById('forgot-password').addEventListener('click', () => {
+        chrome.tabs.create({url: 'https://app.estimateone.com/auth/forgot-password'});
+    });
 }
 
-// Event Listener: Logout
-logoutLink.addEventListener("click", async (e) => {
-  e.preventDefault();
-  try {
-    await sessionStorage.remove(["isLoggedIn", "user", "accessToken", "expiresAt"]);
-    localStorage.clear();
+// UI Management Functions
+function showLoginForm() {
+    console.log('Showing login form');
+    hideAllForms();
+    document.getElementById('login-form').style.display = 'block';
+    clearErrors();
+    
+    // Clear form fields
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+}
 
-    showLoginUI();
+function showSignupForm() {
+    console.log('Showing signup form');
+    hideAllForms();
+    document.getElementById('signup-form').style.display = 'block';
+    clearErrors();
+    
+    // Clear form fields
+    document.getElementById('signup-email').value = '';
+    document.getElementById('signup-password').value = '';
+}
 
-    emailInput.value = "";
-    passwordInput.value = "";
-    clearError();
+function showAuthenticatedUI(user) {
+    console.log('Showing authenticated UI for:', user.email);
+    hideAllForms();
+    document.getElementById('authenticated-ui').style.display = 'block';
+    
+    // Update UI with credential status
+    updateCredentialStatus(user);
+    clearErrors();
+}
 
-    console.log("User logged out, session cleared.");
+function updateCredentialStatus(user) {
+    const statusElement = document.getElementById('credential-status');
+    const statusText = document.getElementById('credential-status-text');
+    
+    console.log('Updating credential status:', user.credentials_stored);
+    
+    if (user.credentials_stored) {
+        statusElement.className = 'credential-status stored';
+        statusText.textContent = '✓ EstimateOne credentials stored securely';
+    } else {
+        statusElement.className = 'credential-status not-stored';
+        statusText.textContent = '⚠ EstimateOne credentials not stored. Please login again.';
+    }
+}
 
-    setTimeout(() => {
-      if (window.chrome && chrome.runtime && chrome.runtime.sendMessage) {
-        window.close();
-      }
-    }, 500);
-  } catch (error) {
-    console.error("Error during logout:", error);
-  }
-});
+function showLoading() {
+    console.log('Showing loading state');
+    hideAllForms();
+    document.getElementById('loading').style.display = 'block';
+}
+
+function hideAllForms() {
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('signup-form').style.display = 'none';
+    document.getElementById('authenticated-ui').style.display = 'none';
+    document.getElementById('loading').style.display = 'none';
+}
+
+function clearErrors() {
+    const errorElements = [
+        'error-message',
+        'signup-error-message', 
+        'scrape-error-message',
+        'scrape-success-message'
+    ];
+    
+    errorElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.style.display = 'none';
+            element.textContent = '';
+        }
+    });
+}
+
+function showError(elementId, message) {
+    console.error('Error:', message);
+    const errorElement = document.getElementById(elementId);
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+}
+
+function showSuccess(elementId, message) {
+    console.log('Success:', message);
+    const successElement = document.getElementById(elementId);
+    if (successElement) {
+        successElement.textContent = message;
+        successElement.style.display = 'block';
+    }
+}
+
+// Authentication Functions
+async function handleLogin() {
+    console.log('Login button clicked');
+    
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+
+    console.log('Login attempt for email:', email);
+
+    if (!email || !password) {
+        showError('error-message', 'Please enter both email and password');
+        return;
+    }
+
+    if (!isValidEmail(email)) {
+        showError('error-message', 'Please enter a valid email address');
+        return;
+    }
+
+    showLoading();
+
+    try {
+        console.log('Sending login request...');
+        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/login`, {
+            method: 'POST',
+            headers: window.ExtensionConfig.getRequestHeaders(),
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+        console.log('Login response:', { 
+            status: response.status, 
+            authenticated: data.authenticated,
+            credentials_stored: data.credentials_stored 
+        });
+
+        if (response.ok && data.authenticated) {
+            console.log('Login successful, storing token...');
+            await storeToken(data.access_token);
+            
+            // Show credential storage status
+            const credentialMessage = data.credentials_stored 
+                ? "Login successful! EstimateOne credentials stored securely." 
+                : "Login successful! Note: Credential storage failed - some features may be limited.";
+            
+            showAuthenticatedUI({
+                ...data.user,
+                credentials_stored: data.credentials_stored
+            });
+            
+            if (data.credentials_stored) {
+                showSuccess('scrape-success-message', credentialMessage);
+            } else {
+                showError('scrape-error-message', credentialMessage);
+            }
+        } else {
+            console.error('Login failed:', data.detail);
+            showLoginForm();
+            showError('error-message', data.detail || 'Login failed');
+        }
+    } catch (error) {
+        console.error('Login network error:', error);
+        showLoginForm();
+        showError('error-message', 'Network error. Please check your connection.');
+    }
+}
+
+async function handleSignup() {
+    console.log('Signup button clicked');
+    
+    const email = document.getElementById('signup-email').value.trim();
+    const password = document.getElementById('signup-password').value.trim();
+
+    console.log('Signup attempt for email:', email);
+
+    if (!email || !password) {
+        showError('signup-error-message', 'Please enter both email and password');
+        return;
+    }
+
+    if (!isValidEmail(email)) {
+        showError('signup-error-message', 'Please enter a valid email address');
+        return;
+    }
+
+    if (password.length < 6) {
+        showError('signup-error-message', 'Password must be at least 6 characters long');
+        return;
+    }
+
+    showLoading();
+
+    try {
+        console.log('Sending signup request...');
+        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/signup`, {
+            method: 'POST',
+            headers: window.ExtensionConfig.getRequestHeaders(),
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+        console.log('Signup response:', { status: response.status, success: data.success });
+
+        if (response.ok && data.success) {
+            console.log('Signup successful');
+            showLoginForm();
+            showSuccess('error-message', 'Account created successfully! Please login to store your credentials.');
+        } else {
+            console.error('Signup failed:', data.detail);
+            showSignupForm();
+            showError('signup-error-message', data.detail || 'Signup failed');
+        }
+    } catch (error) {
+        console.error('Signup network error:', error);
+        showSignupForm();
+        showError('signup-error-message', 'Network error. Please check your connection.');
+    }
+}
+
+async function handleLogout() {
+    console.log('Logout button clicked');
+    
+    try {
+        const token = await getStoredToken();
+        
+        // Try to logout from server
+        if (token) {
+            try {
+                await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/logout`, {
+                    method: 'POST',
+                    headers: {
+                        ...window.ExtensionConfig.getRequestHeaders(),
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                console.log('Server logout successful');
+            } catch (error) {
+                console.log('Server logout failed, but continuing with client logout:', error);
+            }
+        }
+        
+        // Always clear local token and show login form
+        await clearStoredToken();
+        console.log('Token cleared, showing login form');
+        showLoginForm();
+        
+    } catch (error) {
+        console.error('Logout error:', error);
+        // Force logout even if there's an error
+        await clearStoredToken();
+        showLoginForm();
+    }
+}
+
+async function handleCheckCredentials() {
+    console.log('Check credentials button clicked');
+    
+    const token = await getStoredToken();
+    if (!token) {
+        showError('scrape-error-message', 'Please login first');
+        return;
+    }
+
+    try {
+        console.log('Checking credentials status...');
+        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/credentials/status`, {
+            headers: {
+                ...window.ExtensionConfig.getRequestHeaders(),
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+        console.log('Credentials status:', data);
+
+        if (data.credentials_stored) {
+            showSuccess('scrape-success-message', data.message);
+            updateCredentialStatus({ credentials_stored: true });
+        } else {
+            showError('scrape-error-message', data.message);
+            updateCredentialStatus({ credentials_stored: false });
+        }
+    } catch (error) {
+        console.error('Credential check error:', error);
+        showError('scrape-error-message', 'Failed to check credential status');
+    }
+}
+
+async function handleScrapeTenders() {
+    console.log('Scrape tenders button clicked');
+    
+    const token = await getStoredToken();
+    if (!token) {
+        showError('scrape-error-message', 'Please login first');
+        return;
+    }
+
+    try {
+        // Get current tab URL
+        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+        const url = tab.url;
+        console.log('Current tab URL:', url);
+
+        if (!url.includes('estimateone.com')) {
+            showError('scrape-error-message', 'Please navigate to an EstimateOne page first');
+            return;
+        }
+
+        showLoading();
+
+        console.log('Sending scrape request...');
+        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/scrapper/scrape-tenders`, {
+            method: 'POST',
+            headers: {
+                ...window.ExtensionConfig.getRequestHeaders(),
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+        console.log('Scrape response:', { status: response.status, data: data.status });
+
+        showAuthenticatedUI({ credentials_stored: true });
+
+        if (response.ok && data.status === 'success') {
+            showSuccess('scrape-success-message', data.message);
+        } else {
+            showError('scrape-error-message', data.detail || 'Scraping failed');
+        }
+    } catch (error) {
+        console.error('Scraping error:', error);
+        showAuthenticatedUI({ credentials_stored: true });
+        showError('scrape-error-message', 'Network error. Please try again.');
+    }
+}
+
+// Token Management Functions
+async function storeToken(token) {
+    console.log('Storing token...');
+    return new Promise((resolve) => {
+        chrome.storage.local.set({auth_token: token}, () => {
+            console.log('Token stored successfully');
+            resolve();
+        });
+    });
+}
+
+async function getStoredToken() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['auth_token'], (result) => {
+            resolve(result.auth_token);
+        });
+    });
+}
+
+async function clearStoredToken() {
+    console.log('Clearing stored token...');
+    return new Promise((resolve) => {
+        chrome.storage.local.remove(['auth_token'], () => {
+            console.log('Token cleared successfully');
+            resolve();
+        });
+    });
+}
+
+async function verifyToken(token) {
+    console.log('Verifying token...');
+    try {
+        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/me`, {
+            headers: {
+                ...window.ExtensionConfig.getRequestHeaders(),
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const userData = await response.json();
+            console.log('Token verification successful for:', userData.email);
+            return userData;
+        } else {
+            console.log('Token verification failed:', response.status);
+        }
+        return null;
+    } catch (error) {
+        console.error('Token verification error:', error);
+        return null;
+    }
+}
+
+// Utility Functions
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
