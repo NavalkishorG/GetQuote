@@ -1,5 +1,4 @@
 /* styles.css */
-
 body {
     margin: 0;
     padding: 0;
@@ -9,15 +8,6 @@ body {
     width: 400px;
     height: 480px;
     overflow: hidden;
-    transition: width 0.3s ease, height 0.3s ease;
-}
-
-/* Dashboard mode - popup expands to match dashboard size */
-body.dashboard-mode {
-    width: 50vw;
-    height: 50vh;
-    min-width: 600px;
-    min-height: 400px;
 }
 
 .popup-wrapper {
@@ -161,6 +151,20 @@ button.detect-btn:hover {
     background-color: #7b1fa2;
 }
 
+/* Dashboard Button - Keep only this dashboard-related style */
+button.dashboard-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+button.dashboard-btn:hover {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
 a.forgot {
     display: block;
     font-size: 13px;
@@ -241,308 +245,4 @@ a.forgot:hover {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
-}
-
-/* Dashboard Button */
-button.dashboard-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    font-weight: 600;
-    font-size: 16px;
-}
-
-button.dashboard-btn:hover {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
-}
-
-/* Dashboard Modal - UPDATED to fill entire popup when open */
-.dashboard-modal {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
-}
-
-.dashboard-content {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transform: scale(0.95);
-    animation: dashboardOpen 0.3s ease-out forwards;
-}
-
-@keyframes dashboardOpen {
-    from {
-        opacity: 0;
-        transform: scale(0.9);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-.dashboard-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 15px 25px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.dashboard-header h2 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 600;
-}
-
-.close-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    font-size: 20px;
-    width: 35px;
-    height: 35px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s;
-}
-
-.close-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.dashboard-body {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-}
-
-/* Stats Grid - Optimized for dashboard popup */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.stat-card {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 16px;
-    text-align: center;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.stat-number {
-    font-size: 24px;
-    font-weight: 700;
-    color: #2d3748;
-    margin-bottom: 6px;
-}
-
-.stat-label {
-    font-size: 12px;
-    color: #718096;
-    margin-bottom: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.stat-change {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 10px;
-    display: inline-block;
-}
-
-.stat-change.positive {
-    background: #f0fff4;
-    color: #38a169;
-}
-
-.stat-change.negative {
-    background: #fff5f5;
-    color: #e53e3e;
-}
-
-/* Charts Section - Optimized for dashboard popup */
-.charts-section {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.chart-card {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 16px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.chart-card h3 {
-    margin: 0 0 12px 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: #2d3748;
-}
-
-.chart-placeholder {
-    height: 120px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Bar Chart */
-.bar-chart {
-    display: flex;
-    align-items: end;
-    justify-content: space-around;
-    height: 80px;
-    width: 100%;
-}
-
-.bar {
-    width: 20px;
-    background: linear-gradient(to top, #667eea, #764ba2);
-    border-radius: 3px 3px 0 0;
-    margin: 0 1px;
-    opacity: 0.8;
-    transition: opacity 0.2s;
-}
-
-.bar:hover {
-    opacity: 1;
-}
-
-/* Pie Chart */
-.pie-chart {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: conic-gradient(
-        #667eea 0% 45%,
-        #764ba2 45% 70%,
-        #f093fb 70% 90%,
-        #f5576c 90% 100%
-    );
-    margin-bottom: 12px;
-}
-
-.pie-legend {
-    font-size: 10px;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 4px;
-}
-
-.legend-color {
-    width: 8px;
-    height: 8px;
-    border-radius: 2px;
-    margin-right: 6px;
-}
-
-.color-1 { background: #667eea; }
-.color-2 { background: #764ba2; }
-.color-3 { background: #f093fb; }
-.color-4 { background: #f5576c; }
-
-/* Recent Activity - Optimized for dashboard popup */
-.recent-activity {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 16px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.recent-activity h3 {
-    margin: 0 0 12px 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: #2d3748;
-}
-
-.activity-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.activity-item {
-    display: flex;
-    align-items: flex-start;
-    padding: 12px;
-    background: #f7fafc;
-    border-radius: 6px;
-    border-left: 3px solid #667eea;
-}
-
-.activity-icon {
-    font-size: 16px;
-    margin-right: 10px;
-    flex-shrink: 0;
-}
-
-.activity-content {
-    flex: 1;
-}
-
-.activity-title {
-    font-weight: 600;
-    color: #2d3748;
-    margin-bottom: 3px;
-    font-size: 12px;
-}
-
-.activity-meta {
-    font-size: 9px;
-    color: #718096;
-}
-
-/* Responsive Design for Dashboard */
-@media (max-width: 800px) {
-    body.dashboard-mode {
-        width: 60vw;
-        height: 60vh;
-    }
-    
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
 }

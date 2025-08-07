@@ -6,7 +6,8 @@
     "storage",
     "activeTab",
     "scripting",
-    "tabs"
+    "tabs",
+    "windows"
   ],
   "host_permissions": [
     "http://localhost:8000/*",
@@ -25,7 +26,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["popup.html", "config.js"],
+      "resources": ["popup.html", "config.js", "dashboard.html"],
       "matches": ["<all_urls>"]
     }
   ],
