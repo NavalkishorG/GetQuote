@@ -3,71 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GetQuote</title>
+    <title>GetQuote Extension</title>
     <link rel="stylesheet" href="style.css">
     <script src="config.js"></script>
 </head>
 <body>
     <div class="popup-wrapper">
         <div class="scroll-container">
+            <h1 class="popup-heading">GetQuote</h1>
+            
             <!-- Login Form -->
-            <div id="login-form" style="display: none;">
-                <h1 class="popup-heading">GetQuote</h1>
+            <div id="login-form">
                 <p class="description">Sign in to your account</p>
                 <div id="error-message" class="error" style="display: none;"></div>
-                <input type="text" id="login-email" placeholder="Email" autocomplete="email">
-                <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+                <input type="text" id="login-email" placeholder="Email">
+                <input type="password" id="login-password" placeholder="Password">
                 <button id="login-btn" class="login">Sign In</button>
                 <button id="show-signup-btn" class="signup">Create Account</button>
-                <a href="#" id="forgot-password" class="forgot">Forgot Password?</a>
+                <a id="forgot-password" class="forgot">Forgot Password?</a>
             </div>
 
             <!-- Signup Form -->
             <div id="signup-form" style="display: none;">
-                <h1 class="popup-heading">GetQuote</h1>
                 <p class="description">Create your account</p>
                 <div id="signup-error-message" class="error" style="display: none;"></div>
-                <input type="text" id="signup-email" placeholder="Email" autocomplete="email">
-                <input type="password" id="signup-password" placeholder="Password" autocomplete="new-password">
+                <input type="text" id="signup-email" placeholder="Email">
+                <input type="password" id="signup-password" placeholder="Password (min 6 characters)">
                 <button id="signup-btn" class="signup">Create Account</button>
                 <button id="show-login-btn" class="login">Back to Sign In</button>
             </div>
 
             <!-- Authenticated UI -->
             <div id="authenticated-ui" style="display: none;">
-                <h1 class="popup-heading">Welcome back!</h1>
+                <p class="authenticated">Welcome back!</p>
+                
                 <div id="credential-status" class="credential-status">
-                    <span id="credential-status-text">Checking credentials...</span>
+                    <div id="credential-status-text">Checking credentials...</div>
                 </div>
+                
                 <div id="scrape-success-message" class="success" style="display: none;"></div>
                 <div id="scrape-error-message" class="error" style="display: none;"></div>
                 
                 <button id="view-dashboard-btn" class="dashboard-btn">📊 View Dashboard</button>
                 <button id="scrape-tenders-btn" class="scrape-btn">🔍 Scrape Tenders</button>
-                <button id="detect-project-id-btn" class="check-btn">🔍 Detect Project ID</button>
+                <button id="detect-project-id-btn" class="detect-btn">🔍 Detect Project ID</button>
                 <button id="check-credentials-btn" class="check-btn">✓ Check Credentials</button>
                 <button id="logout-btn" class="logout-btn">Sign Out</button>
             </div>
 
-            <!-- Loading State -->
+            <!-- Loading -->
             <div id="loading" style="display: none;">
-                <h1 class="popup-heading">GetQuote</h1>
-                <p class="description">Please wait...</p>
                 <div class="loading-spinner"></div>
+                <p>Please wait...</p>
             </div>
         </div>
     </div>
 
     <!-- Dashboard Modal -->
     <div id="dashboard-modal" class="dashboard-modal" style="display: none;">
-        <div class="dashboard-overlay"></div>
         <div class="dashboard-content">
             <div class="dashboard-header">
                 <h2>GetQuote Analytics Dashboard</h2>
-                <button id="close-dashboard" class="close-btn">&times;</button>
+                <button id="close-dashboard" class="close-btn">×</button>
             </div>
+            
             <div class="dashboard-body">
-                <!-- Dashboard content remains the same as your original -->
+                <!-- Stats Cards -->
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-number">247</div>
@@ -90,47 +91,43 @@
                         <div class="stat-change negative">-2% this month</div>
                     </div>
                 </div>
-                
+
+                <!-- Charts Section -->
                 <div class="charts-section">
                     <div class="chart-card">
                         <h3>Monthly Tender Activity</h3>
                         <div class="chart-placeholder">
                             <div class="bar-chart">
-                                <div class="bar" style="height: 60%;"></div>
-                                <div class="bar" style="height: 80%;"></div>
-                                <div class="bar" style="height: 45%;"></div>
-                                <div class="bar" style="height: 90%;"></div>
-                                <div class="bar" style="height: 75%;"></div>
-                                <div class="bar" style="height: 65%;"></div>
+                                <div class="bar" style="height: 60%"></div>
+                                <div class="bar" style="height: 80%"></div>
+                                <div class="bar" style="height: 45%"></div>
+                                <div class="bar" style="height: 90%"></div>
+                                <div class="bar" style="height: 70%"></div>
+                                <div class="bar" style="height: 85%"></div>
                             </div>
                         </div>
                     </div>
+                    
                     <div class="chart-card">
                         <h3>Bid Categories</h3>
                         <div class="chart-placeholder">
-                            <div class="pie-chart"></div>
+                            <div class="pie-chart">
+                                <div class="pie-slice slice-1"></div>
+                                <div class="pie-slice slice-2"></div>
+                                <div class="pie-slice slice-3"></div>
+                                <div class="pie-slice slice-4"></div>
+                            </div>
                             <div class="pie-legend">
-                                <div class="legend-item">
-                                    <div class="legend-color color-1"></div>
-                                    <span>Construction (45%)</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-color color-2"></div>
-                                    <span>IT Services (25%)</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-color color-3"></div>
-                                    <span>Consulting (20%)</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-color color-4"></div>
-                                    <span>Others (10%)</span>
-                                </div>
+                                <div class="legend-item"><span class="legend-color color-1"></span>Construction (45%)</div>
+                                <div class="legend-item"><span class="legend-color color-2"></span>IT Services (25%)</div>
+                                <div class="legend-item"><span class="legend-color color-3"></span>Consulting (20%)</div>
+                                <div class="legend-item"><span class="legend-color color-4"></span>Others (10%)</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Recent Activity -->
                 <div class="recent-activity">
                     <h3>Recent Tender Activity</h3>
                     <div class="activity-list">
@@ -156,7 +153,7 @@
                             </div>
                         </div>
                         <div class="activity-item">
-                            <div class="activity-icon">🚚</div>
+                            <div class="activity-icon">🚛</div>
                             <div class="activity-content">
                                 <div class="activity-title">Logistics Services RFP</div>
                                 <div class="activity-meta">Value: $200,000 • Status: Lost • 1 week ago</div>

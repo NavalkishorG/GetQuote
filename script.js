@@ -207,12 +207,13 @@ function attachSignupEventListeners() {
 }
 
 function attachAuthenticatedEventListeners() {
+    console.log('Attaching authenticated event listeners...');
+    
     const logoutBtn = document.getElementById('logout-btn');
     const scrapeTendersBtn = document.getElementById('scrape-tenders-btn');
     const checkCredentialsBtn = document.getElementById('check-credentials-btn');
-    const detectProjectIdBtn = document.getElementById('detect-project-id-btn'); // NEW
+    const detectProjectIdBtn = document.getElementById('detect-project-id-btn');
     const viewDashboardBtn = document.getElementById('view-dashboard-btn');
-    const closeDashboardBtn = document.getElementById('close-dashboard');
 
     // Remove existing listeners to prevent duplicates
     if (logoutBtn) {
@@ -230,32 +231,16 @@ function attachAuthenticatedEventListeners() {
         document.getElementById('check-credentials-btn').addEventListener('click', handleCheckCredentials);
     }
 
-    // NEW: Add project ID detection listener
     if (detectProjectIdBtn) {
         detectProjectIdBtn.replaceWith(detectProjectIdBtn.cloneNode(true));
         document.getElementById('detect-project-id-btn').addEventListener('click', handleDetectProjectId);
     }
 
-    // Dashboard event listeners
+    // Dashboard event listeners - FIXED
     if (viewDashboardBtn) {
         viewDashboardBtn.replaceWith(viewDashboardBtn.cloneNode(true));
         document.getElementById('view-dashboard-btn').addEventListener('click', handleViewDashboard);
-    }
-
-    if (closeDashboardBtn) {
-        closeDashboardBtn.replaceWith(closeDashboardBtn.cloneNode(true));
-        document.getElementById('close-dashboard').addEventListener('click', closeDashboard);
-    }
-
-    // Close dashboard when clicking overlay
-    const dashboardModal = document.getElementById('dashboard-modal');
-    if (dashboardModal) {
-        dashboardModal.replaceWith(dashboardModal.cloneNode(true));
-        document.getElementById('dashboard-modal').addEventListener('click', (e) => {
-            if (e.target.classList.contains('dashboard-overlay')) {
-                closeDashboard();
-            }
-        });
+        console.log('Dashboard button listener attached');
     }
 
     // Close dashboard with Escape key
@@ -263,7 +248,7 @@ function attachAuthenticatedEventListeners() {
     document.addEventListener('keydown', handleEscapeKey);
 }
 
-// NEW: Project ID Detection Handler
+// Project ID Detection Handler
 async function handleDetectProjectId() {
     console.log('Detect Project ID button clicked');
     disableAllButtons();
@@ -271,7 +256,6 @@ async function handleDetectProjectId() {
     try {
         // Get current tab
         const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-        
         if (!tab.url.includes('estimateone.com')) {
             showError('scrape-error-message', 'Please navigate to an EstimateOne page first');
             return;
@@ -284,13 +268,11 @@ async function handleDetectProjectId() {
         });
 
         const projectId = results[0].result;
-        
         if (projectId) {
             showSuccess('scrape-success-message', `ID = ${projectId}`);
         } else {
             showError('scrape-error-message', 'No popup');
         }
-
     } catch (error) {
         console.error('Project ID detection error:', error);
         showError('scrape-error-message', 'Failed to detect project ID');
@@ -299,79 +281,121 @@ async function handleDetectProjectId() {
     }
 }
 
-// NEW: Content script function to detect project ID using Option 5 (robust fallback)
+// UPDATED: Content script function to detect project ID ONLY when popup is open
 function detectProjectIdInPage() {
     console.log('🔍 Starting project ID detection...');
     
-    // Option 5: Multiple selector fallback approach
+    // STEP 1: First check if ANY popup is actually open
+    const popupSelectors = [
+        '.slide-pane__content',           // Main popup container
+        '.ReactModal__Content',           // React modal content
+        '[role="dialog"]',                // ARIA dialog role
+        '.styles__slider__a65e8ea3f368640c502d', // Specific slider class from your HTML
+        '.ReactModal__Overlay--after-open' // React modal overlay when open
+    ];
+    
+    let isPopupOpen = false;
+    let popupContainer = null;
+    
+    // Check each popup selector
+    for (const selector of popupSelectors) {
+        try {
+            const element = document.querySelector(selector);
+            if (element) {
+                // Additional check - make sure popup is visible
+                const computedStyle = window.getComputedStyle(element);
+                const isVisible = computedStyle.display !== 'none' && 
+                                computedStyle.visibility !== 'hidden' &&
+                                computedStyle.opacity !== '0';
+                
+                if (isVisible) {
+                    console.log(`✅ Found open popup with selector: ${selector}`);
+                    isPopupOpen = true;
+                    popupContainer = element;
+                    break;
+                }
+            }
+        } catch (error) {
+            console.warn(`⚠️ Popup check failed for selector: ${selector}`, error);
+            continue;
+        }
+    }
+    
+    // STEP 2: If no popup is open, return null immediately
+    if (!isPopupOpen || !popupContainer) {
+        console.log('❌ No popup is currently open');
+        return null;
+    }
+    
+    console.log('✅ Popup is open, proceeding with ID detection...');
+    
+    // STEP 3: Only search for project ID within the open popup container
     const selectors = [
         '.styles__projectId__f47058b1431204abe7ec',  // Direct class selector (most reliable)
         '[class*="projectId"]',                       // Any class containing "projectId"
         'span[title*="ID"]',                         // Span with title containing "ID"
         '#project-slider-header .styles__projectId__f47058b1431204abe7ec', // ID-based selector
-        '.slide-pane__content .styles__projectId__f47058b1431204abe7ec'   // Within popup content
     ];
 
-    // Try each selector in order of reliability
+    // Try each selector ONLY within the popup container
     for (const selector of selectors) {
         try {
-            const element = document.querySelector(selector);
+            // Search within the popup container, not the entire document
+            const element = popupContainer.querySelector(selector);
             if (element && element.textContent) {
                 const text = element.textContent.trim();
-                console.log(`✅ Found element with selector: ${selector}, text: ${text}`);
+                console.log(`✅ Found element within popup: ${selector}, text: ${text}`);
                 
                 // Extract just the ID number from text like "ID #169451"
                 const idMatch = text.match(/(?:ID\s*#?\s*)?(\d+)/i);
                 if (idMatch) {
                     const projectId = idMatch[1];
-                    console.log(`🎯 Extracted project ID: ${projectId}`);
+                    console.log(`🎯 Extracted project ID from popup: ${projectId}`);
                     return projectId;
                 }
             }
         } catch (error) {
-            console.warn(`⚠️ Selector failed: ${selector}`, error);
+            console.warn(`⚠️ Selector failed within popup: ${selector}`, error);
             continue;
         }
     }
 
-    // Fallback: Text-based search in popup content
+    // STEP 4: Fallback - Text-based search ONLY within popup content
     try {
-        const popupContent = document.querySelector('.slide-pane__content');
-        if (popupContent) {
-            const fullText = popupContent.textContent || popupContent.innerText;
-            const idMatch = fullText.match(/ID\s*#?\s*(\d+)/i);
-            if (idMatch) {
-                const projectId = idMatch[1];
-                console.log(`🎯 Found project ID via text search: ${projectId}`);
-                return projectId;
-            }
+        const fullText = popupContainer.textContent || popupContainer.innerText;
+        const idMatch = fullText.match(/ID\s*#?\s*(\d+)/i);
+        if (idMatch) {
+            const projectId = idMatch[1];
+            console.log(`🎯 Found project ID via text search within popup: ${projectId}`);
+            return projectId;
         }
     } catch (error) {
-        console.warn('⚠️ Text-based fallback failed:', error);
+        console.warn('⚠️ Text-based fallback failed within popup:', error);
     }
 
-    // Final fallback: XPath for text pattern matching
+    // STEP 5: Final fallback - XPath ONLY within popup
     try {
-        const xpath = "//span[contains(text(), 'ID #') or contains(text(), 'ID#')]";
-        const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const xpath = ".//span[contains(text(), 'ID #') or contains(text(), 'ID#')]";
+        const result = document.evaluate(xpath, popupContainer, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
         if (result.singleNodeValue) {
             const text = result.singleNodeValue.textContent.trim();
             const idMatch = text.match(/ID\s*#?\s*(\d+)/i);
             if (idMatch) {
                 const projectId = idMatch[1];
-                console.log(`🎯 Found project ID via XPath: ${projectId}`);
+                console.log(`🎯 Found project ID via XPath within popup: ${projectId}`);
                 return projectId;
             }
         }
     } catch (error) {
-        console.warn('⚠️ XPath fallback failed:', error);
+        console.warn('⚠️ XPath fallback failed within popup:', error);
     }
 
-    console.log('❌ No project ID found');
+    console.log('❌ No project ID found within the open popup');
     return null;
 }
 
-// Add this new function for escape key handling
+
+// Escape key handler
 function handleEscapeKey(e) {
     if (e.key === 'Escape') {
         const modal = document.getElementById('dashboard-modal');
@@ -381,7 +405,7 @@ function handleEscapeKey(e) {
     }
 }
 
-// Dashboard Functions
+// Dashboard Functions - UPDATED with popup resizing and fixed close button
 function handleViewDashboard() {
     console.log('View dashboard button clicked');
     showDashboard();
@@ -389,15 +413,37 @@ function handleViewDashboard() {
 
 function showDashboard() {
     console.log('Showing dashboard modal');
+    
+    // Resize popup to match dashboard size
+    document.body.classList.add('dashboard-mode');
+    
     const modal = document.getElementById('dashboard-modal');
     if (modal) {
         modal.style.display = 'flex';
         modal.style.opacity = '0';
         
-        setTimeout(() => {
-            modal.style.transition = 'opacity 0.3s ease';
+        // Attach close button event listener every time we show the modal
+        const closeBtnInModal = modal.querySelector('#close-dashboard');
+        if (closeBtnInModal) {
+            // Remove any existing listeners
+            closeBtnInModal.replaceWith(closeBtnInModal.cloneNode(true));
+            // Attach new listener
+            modal.querySelector('#close-dashboard').addEventListener('click', closeDashboard);
+            console.log('Close button listener attached');
+        }
+        
+        // Also attach click outside to close
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeDashboard();
+            }
+        });
+        
+        // Add smooth entrance animation
+        requestAnimationFrame(() => {
+            modal.style.transition = 'opacity 0.4s ease-out';
             modal.style.opacity = '1';
-        }, 10);
+        });
     } else {
         console.error('Dashboard modal element not found');
     }
@@ -405,13 +451,16 @@ function showDashboard() {
 
 function closeDashboard() {
     console.log('Closing dashboard modal');
+    
     const modal = document.getElementById('dashboard-modal');
     if (modal) {
-        modal.style.transition = 'opacity 0.3s ease';
+        modal.style.transition = 'opacity 0.3s ease-in';
         modal.style.opacity = '0';
         
         setTimeout(() => {
             modal.style.display = 'none';
+            // Restore original popup size
+            document.body.classList.remove('dashboard-mode');
         }, 300);
     }
 }
@@ -545,17 +594,14 @@ async function handleLogout() {
     disableAllButtons();
     
     try {
-        // Verify we're still in the right state
         const token = await getStoredToken();
         if (!token) {
             showLoginForm();
             return;
         }
 
-        // Show loading state immediately
         showLoading();
         
-        // Try to logout from server
         try {
             await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/logout`, {
                 method: 'POST',
@@ -569,18 +615,15 @@ async function handleLogout() {
             console.log('Server logout failed, but continuing with client logout:', error);
         }
 
-        // Always clear local token
         await clearStoredToken();
         console.log('Token cleared, showing login form');
         
-        // Show login form with a small delay to ensure cleanup
         setTimeout(() => {
             showLoginForm();
         }, 100);
         
     } catch (error) {
         console.error('Logout error:', error);
-        // Force logout even if there's an error
         await clearStoredToken();
         setTimeout(() => {
             showLoginForm();
@@ -624,7 +667,6 @@ async function handleCheckCredentials() {
     } catch (error) {
         console.error('Credential check error:', error);
         
-        // Always return to authenticated UI, not stuck in loading
         const token = await getStoredToken();
         if (token) {
             try {
@@ -659,7 +701,6 @@ async function handleScrapeTenders() {
             return;
         }
 
-        // Get current tab URL
         const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
         const url = tab.url;
         
@@ -685,7 +726,6 @@ async function handleScrapeTenders() {
         const data = await response.json();
         console.log('Scrape response:', { status: response.status, data: data.status });
 
-        // Always return to authenticated UI
         const user = await verifyToken(token);
         if (user) {
             showAuthenticatedUI(user);
@@ -702,7 +742,6 @@ async function handleScrapeTenders() {
     } catch (error) {
         console.error('Scraping error:', error);
         
-        // Always return to authenticated UI, not stuck in loading
         const token = await getStoredToken();
         if (token) {
             try {
