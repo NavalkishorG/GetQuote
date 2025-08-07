@@ -3,116 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GetQuote Analytics Dashboard</title>
+    <title>📊 GetQuote Analytics Dashboard</title>
     <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Dashboard Header -->
         <div class="dashboard-header">
-            <h2>📊 GetQuote Analytics Dashboard</h2>
-            <button id="close-dashboard" class="close-btn" title="Close Dashboard">×</button>
+            <h2>📊 GetQuote Builder Analytics</h2>
+            <button id="close-dashboard" class="close-btn">×</button>
         </div>
-
-        <!-- Dashboard Content -->
+        
         <div class="dashboard-content">
-            <!-- Stats Grid -->
+            <!-- Key Metrics -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">247</div>
-                    <div class="stat-label">Total Tenders</div>
+                    <div class="stat-label">Active Projects</div>
                     <div class="stat-change positive">+12% this month</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">$2.4M</div>
-                    <div class="stat-label">Total Value</div>
-                    <div class="stat-change positive">+8.5% this month</div>
+                    <div class="stat-number">1,340</div>
+                    <div class="stat-label">Total Subcontractors</div>
+                    <div class="stat-change positive">+45 new</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">18</div>
-                    <div class="stat-label">Won Bids</div>
-                    <div class="stat-change positive">+3 this week</div>
+                    <div class="stat-number">89</div>
+                    <div class="stat-label">Avg Matches/Project</div>
+                    <div class="stat-change positive">+15% improvement</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">73%</div>
-                    <div class="stat-label">Success Rate</div>
+                    <div class="stat-label">Quote Response Rate</div>
                     <div class="stat-change negative">-2% this month</div>
                 </div>
             </div>
 
-            <!-- Charts Section -->
-            <div class="charts-section">
-                <div class="chart-card">
-                    <h3>Monthly Tender Activity</h3>
-                    <div class="chart-placeholder">
-                        <div class="bar-chart">
-                            <div class="bar" style="height: 60%"></div>
-                            <div class="bar" style="height: 80%"></div>
-                            <div class="bar" style="height: 45%"></div>
-                            <div class="bar" style="height: 90%"></div>
-                            <div class="bar" style="height: 70%"></div>
-                            <div class="bar" style="height: 85%"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Bid Categories</h3>
-                    <div class="chart-placeholder">
-                        <div style="text-align: center;">
-                            <div class="pie-chart"></div>
-                            <div class="pie-legend">
-                                <div class="legend-item">
-                                    <div class="legend-color color-1"></div>
-                                    <span>Construction (45%)</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-color color-2"></div>
-                                    <span>IT Services (25%)</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-color color-3"></div>
-                                    <span>Consulting (20%)</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-color color-4"></div>
-                                    <span>Others (10%)</span>
-                                </div>
+            <!-- Top Projects Section -->
+            <div class="top-projects-section">
+                <h3>🏆 Top Projects by Subcontractor Matches</h3>
+                <div class="projects-grid">
+                    <div class="project-card high-priority">
+                        <div class="project-header">
+                            <div class="project-info">
+                                <h4>Sydney CBD Office Tower</h4>
+                                <span class="project-id">#169451</span>
+                            </div>
+                            <div class="match-badge excellent">
+                                <span class="match-count">156</span>
+                                <span class="match-label">matches</span>
                             </div>
                         </div>
+                        <div class="project-details">
+                            <div class="detail-item">
+                                <span class="icon">💰</span>
+                                <span>$2.4M estimated value</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="icon">🔨</span>
+                                <span>12 trade categories</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="icon">📅</span>
+                                <span>Closes in 5 days</span>
+                            </div>
+                        </div>
+                        <div class="trade-breakdown">
+                            <div class="trade-tag">Electrical (25)</div>
+                            <div class="trade-tag">Plumbing (18)</div>
+                            <div class="trade-tag">HVAC (22)</div>
+                            <div class="trade-tag">+9 more</div>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- Recent Activity -->
-            <div class="recent-activity">
-                <h3>Recent Tender Activity</h3>
-                <div class="activity-list">
-                    <div class="activity-item">
-                        <div class="activity-icon">🏗️</div>
-                        <div class="activity-content">
-                            <div class="activity-title">Bridge Construction Project</div>
-                            <div class="activity-meta">Value: $850,000 • Status: Pending • 2 hours ago</div>
+                    <div class="project-card medium-priority">
+                        <div class="project-header">
+                            <div class="project-info">
+                                <h4>Melbourne Hospital Extension</h4>
+                                <span class="project-id">#145892</span>
+                            </div>
+                            <div class="match-badge good">
+                                <span class="match-count">134</span>
+                                <span class="match-label">matches</span>
+                            </div>
+                        </div>
+                        <div class="project-details">
+                            <div class="detail-item">
+                                <span class="icon">💰</span>
+                                <span>$1.8M estimated value</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="icon">🔨</span>
+                                <span>10 trade categories</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="icon">📅</span>
+                                <span>Closes in 8 days</span>
+                            </div>
+                        </div>
+                        <div class="trade-breakdown">
+                            <div class="trade-tag">Medical Fit-out (15)</div>
+                            <div class="trade-tag">Electrical (20)</div>
+                            <div class="trade-tag">Fire Safety (12)</div>
+                            <div class="trade-tag">+7 more</div>
                         </div>
                     </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">💻</div>
-                        <div class="activity-content">
-                            <div class="activity-title">Software Development Contract</div>
-                            <div class="activity-meta">Value: $120,000 • Status: Won • 1 day ago</div>
+
+                    <div class="project-card medium-priority">
+                        <div class="project-header">
+                            <div class="project-info">
+                                <h4>Brisbane Warehouse Complex</h4>
+                                <span class="project-id">#178234</span>
+                            </div>
+                            <div class="match-badge good">
+                                <span class="match-count">98</span>
+                                <span class="match-label">matches</span>
+                            </div>
+                        </div>
+                        <div class="project-details">
+                            <div class="detail-item">
+                                <span class="icon">💰</span>
+                                <span>$950K estimated value</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="icon">🔨</span>
+                                <span>8 trade categories</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="icon">📅</span>
+                                <span>Closes in 12 days</span>
+                            </div>
+                        </div>
+                        <div class="trade-breakdown">
+                            <div class="trade-tag">Concrete (16)</div>
+                            <div class="trade-tag">Steel Frame (14)</div>
+                            <div class="trade-tag">Roofing (10)</div>
+                            <div class="trade-tag">+5 more</div>
                         </div>
                     </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">🏢</div>
-                        <div class="activity-content">
-                            <div class="activity-title">Office Renovation Tender</div>
-                            <div class="activity-meta">Value: $75,000 • Status: Submitted • 3 days ago</div>
+
+                    <div class="project-card low-priority">
+                        <div class="project-header">
+                            <div class="project-info">
+                                <h4>Perth Retail Renovation</h4>
+                                <span class="project-id">#156789</span>
+                            </div>
+                            <div class="match-badge average">
+                                <span class="match-count">67</span>
+                                <span class="match-label">matches</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">🚚</div>
-                        <div class="activity-content">
-                            <div class="activity-title">Logistics Services RFP</div>
-                            <div class="activity-meta">Value: $200,000 • Status: Lost • 1 week ago</div>
+                        <div class="project-details">
+                            <div class="detail-item">
+                                <span class="icon">💰</span>
+                                <span>$420K estimated value</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="icon">🔨</span>
+                                <span>6 trade categories</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="icon">📅</span>
+                                <span>Closes in 15 days</span>
+                            </div>
+                        </div>
+                        <div class="trade-breakdown">
+                            <div class="trade-tag">Fit-out (8)</div>
+                            <div class="trade-tag">Electrical (12)</div>
+                            <div class="trade-tag">Flooring (7)</div>
+                            <div class="trade-tag">+3 more</div>
                         </div>
                     </div>
                 </div>
@@ -120,7 +178,6 @@
         </div>
     </div>
 
-    <script src="config.js"></script>
     <script src="dashboard.js"></script>
 </body>
 </html>
