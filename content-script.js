@@ -321,7 +321,7 @@ function updateSelectionCounters(currentPageCount) {
     }
 }
 
-// Add enhanced selection indicator to project
+// Add selection indicator to project
 function addProjectSelectionIndicator(project, index) {
     if (!project.container) return;
     
@@ -332,38 +332,44 @@ function addProjectSelectionIndicator(project, index) {
     indicator.className = 'project-selection-indicator';
     indicator.innerHTML = `
         <div class="selection-checkbox">
-            <input type="checkbox" id="project-${project.id}" ${isSelected ? 'checked' : ''}>
-            <label for="project-${project.id}">
-                <span class="checkmark">${isSelected ? '✓' : ''}</span>
-                <span class="project-info">
-                    <strong>ID: ${project.id}</strong>
-                    ${isSelected ? '<span style="color: #28a745; font-weight: bold;"> (SELECTED)</span>' : ''}
-                </span>
+            <input type="checkbox" id="project-${project.id}" ${isSelected ? 'checked' : ''} style="display: block; width: 18px; height: 18px; margin-right: 8px;">
+            <label for="project-${project.id}" style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
+                <div class="checkmark-container" style="margin-right: 10px;">
+                    <span class="checkmark" style="font-size: 16px; color: ${isSelected ? '#28a745' : '#ccc'};">${isSelected ? '✅' : '☐'}</span>
+                </div>
+                <div class="project-info" style="flex: 1;">
+                    <div style="font-size: 16px; font-weight: bold; color: #000; margin-bottom: 4px;">
+                        🆔 PROJECT ID: ${project.id}
+                    </div>
+                    <div style="font-size: 12px; color: #666; line-height: 1.3;">
+                        📋 ${project.title}<br>
+                        ⏰ ${project.deadline}<br>
+                        💰 ${project.value}
+                    </div>
+                    ${isSelected ? '<div style="color: #28a745; font-weight: bold; font-size: 12px; margin-top: 4px;">✅ SELECTED</div>' : ''}
+                </div>
             </label>
-        </div>
-        <div class="project-details">
-            <div style="font-size: 10px; color: #666;">
-                📋 ${project.title}<br>
-                ⏰ ${project.deadline}<br>
-                💰 ${project.value}
-            </div>
         </div>
     `;
     
-    // Style the indicator
+            // Style the indicator
     Object.assign(indicator.style, {
         position: 'absolute',
-        top: '-15px',
-        right: '-15px',
+        top: '-20px',
+        right: '-20px',
         background: isSelected ? '#e8f5e8' : 'white',
         border: isSelected ? '3px solid #28a745' : '2px solid #007bff',
         borderRadius: '12px',
-        padding: '12px',
-        boxShadow: '0 6px 20px rgba(0, 0, 0, 0.2)',
+        padding: '15px',
+        boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
         zIndex: '1000',
-        minWidth: '220px',
-        fontSize: '12px'
+        minWidth: '320px',
+        maxWidth: '400px',
+        fontSize: '14px',
+        cursor: 'pointer'
     });
+
+    
     
     // Add click handler for selection toggle
     const checkbox = indicator.querySelector('input[type="checkbox"]');
@@ -405,27 +411,29 @@ function updateProjectIndicator(projectId, isSelected) {
     const indicator = container.querySelector('.project-selection-indicator');
     const checkbox = indicator?.querySelector('input[type="checkbox"]');
     const checkmark = indicator?.querySelector('.checkmark');
-    const projectInfo = indicator?.querySelector('.project-info');
+    const selectedStatus = indicator?.querySelector('div[style*="color: #28a745"]');
     
     if (indicator && checkbox && checkmark) {
         checkbox.checked = isSelected;
-        checkmark.textContent = isSelected ? '✓' : '';
+        checkmark.textContent = isSelected ? '✅' : '☐';
+        checkmark.style.color = isSelected ? '#28a745' : '#ccc';
         
         // Update styling
         indicator.style.background = isSelected ? '#e8f5e8' : 'white';
         indicator.style.border = isSelected ? '3px solid #28a745' : '2px solid #007bff';
         
-        // Update text
-        if (projectInfo) {
-            const selectedSpan = projectInfo.querySelector('span[style*="color: #28a745"]');
-            if (isSelected && !selectedSpan) {
-                projectInfo.innerHTML += '<span style="color: #28a745; font-weight: bold;"> (SELECTED)</span>';
-            } else if (!isSelected && selectedSpan) {
-                selectedSpan.remove();
+        // Update selected status text
+        if (isSelected && !selectedStatus) {
+            const projectInfo = indicator.querySelector('.project-info');
+            if (projectInfo) {
+                projectInfo.innerHTML += '<div style="color: #28a745; font-weight: bold; font-size: 12px; margin-top: 4px;">✅ SELECTED</div>';
             }
+        } else if (!isSelected && selectedStatus) {
+            selectedStatus.remove();
         }
     }
 }
+
 
 // Select all projects on current page
 async function selectAllProjectsOnPage() {
