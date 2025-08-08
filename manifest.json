@@ -11,11 +11,21 @@
   ],
   "host_permissions": [
     "http://localhost:8000/*",
-    "https://*.ngrok-free.app/*"
+    "https://*.ngrok-free.app/*",
+    "https://estimateone.com/*",
+    "https://*.estimateone.com/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["https://estimateone.com/*", "https://*.estimateone.com/*"],
+      "js": ["content-script.js"],
+      "css": ["project-selector.css"],
+      "run_at": "document_end"
+    }
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "getquote-private-test@example.com"
@@ -26,7 +36,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["popup.html", "config.js", "dashboard.html"],
+      "resources": ["popup.html", "config.js", "dashboard.html", "project-selector.css"],
       "matches": ["<all_urls>"]
     }
   ],

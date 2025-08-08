@@ -29,10 +29,8 @@ function showLoginForm() {
     hideAllForms();
     document.getElementById('login-form').style.display = 'block';
     clearErrors();
-    // Clear form fields
     document.getElementById('login-email').value = '';
     document.getElementById('login-password').value = '';
-    // Re-attach event listeners for login form
     attachLoginEventListeners();
 }
 
@@ -41,10 +39,8 @@ function showSignupForm() {
     hideAllForms();
     document.getElementById('signup-form').style.display = 'block';
     clearErrors();
-    // Clear form fields
     document.getElementById('signup-email').value = '';
     document.getElementById('signup-password').value = '';
-    // Re-attach event listeners for signup form
     attachSignupEventListeners();
 }
 
@@ -54,7 +50,6 @@ function showAuthenticatedUI(user) {
     document.getElementById('authenticated-ui').style.display = 'block';
     updateCredentialStatus(user);
     clearErrors();
-    // Re-attach event listeners for authenticated UI
     attachAuthenticatedEventListeners();
 }
 
@@ -144,7 +139,6 @@ function attachLoginEventListeners() {
     const loginPassword = document.getElementById('login-password');
     const forgotPassword = document.getElementById('forgot-password');
 
-    // Remove existing listeners to prevent duplicates
     if (loginBtn) {
         loginBtn.replaceWith(loginBtn.cloneNode(true));
         document.getElementById('login-btn').addEventListener('click', handleLogin);
@@ -180,7 +174,6 @@ function attachSignupEventListeners() {
     const signupEmail = document.getElementById('signup-email');
     const signupPassword = document.getElementById('signup-password');
 
-    // Remove existing listeners to prevent duplicates
     if (signupBtn) {
         signupBtn.replaceWith(signupBtn.cloneNode(true));
         document.getElementById('signup-btn').addEventListener('click', handleSignup);
@@ -208,11 +201,11 @@ function attachAuthenticatedEventListeners() {
     console.log('Attaching authenticated event listeners...');
     const logoutBtn = document.getElementById('logout-btn');
     const scrapeTendersBtn = document.getElementById('scrape-tenders-btn');
+    const scrapeSelectedBtn = document.getElementById('scrape-selected-btn');
     const checkCredentialsBtn = document.getElementById('check-credentials-btn');
     const detectProjectIdBtn = document.getElementById('detect-project-id-btn');
     const viewDashboardBtn = document.getElementById('view-dashboard-btn');
 
-    // Remove existing listeners to prevent duplicates
     if (logoutBtn) {
         logoutBtn.replaceWith(logoutBtn.cloneNode(true));
         document.getElementById('logout-btn').addEventListener('click', handleLogout);
@@ -221,6 +214,12 @@ function attachAuthenticatedEventListeners() {
     if (scrapeTendersBtn) {
         scrapeTendersBtn.replaceWith(scrapeTendersBtn.cloneNode(true));
         document.getElementById('scrape-tenders-btn').addEventListener('click', handleScrapeTenders);
+    }
+
+    // NEW: Scrape Selected Projects button
+    if (scrapeSelectedBtn) {
+        scrapeSelectedBtn.replaceWith(scrapeSelectedBtn.cloneNode(true));
+        document.getElementById('scrape-selected-btn').addEventListener('click', handleScrapeSelectedProjects);
     }
 
     if (checkCredentialsBtn) {
@@ -233,7 +232,6 @@ function attachAuthenticatedEventListeners() {
         document.getElementById('detect-project-id-btn').addEventListener('click', handleDetectProjectId);
     }
 
-    // Dashboard event listeners - UPDATED with chrome.windows.create approach
     if (viewDashboardBtn) {
         viewDashboardBtn.replaceWith(viewDashboardBtn.cloneNode(true));
         document.getElementById('view-dashboard-btn').addEventListener('click', handleViewDashboard);
@@ -241,17 +239,15 @@ function attachAuthenticatedEventListeners() {
     }
 }
 
-// Dashboard Functions - UPDATED with chrome.windows.create approach
+// Dashboard Functions
 let dashboardWindowId = null;
 
 async function handleViewDashboard() {
     console.log('View dashboard button clicked');
     try {
-        // Get current browser window
         chrome.windows.getCurrent(async (currentWindow) => {
             const targetURL = 'dashboard.html';
             
-            // Check if dashboard window already exists
             chrome.windows.getAll({populate: true, windowTypes: ['popup']}, (windowArray) => {
                 const queryURL = `chrome-extension://${chrome.runtime.id}/${targetURL}`;
                 const existingDashboard = windowArray.find(window => 
@@ -259,13 +255,11 @@ async function handleViewDashboard() {
                 );
                 
                 if (existingDashboard) {
-                    // Focus existing dashboard window
                     chrome.windows.update(existingDashboard.id, {focused: true});
                     console.log('Focused existing dashboard window');
                     return;
                 }
                 
-                // Create new centered dashboard window
                 const width = Math.round(currentWindow.width * 0.7);
                 const height = Math.round(currentWindow.height * 0.8);
                 const left = Math.round((currentWindow.width - width) * 0.5 + currentWindow.left);
@@ -283,9 +277,6 @@ async function handleViewDashboard() {
                     if (newWindow) {
                         dashboardWindowId = newWindow.id;
                         console.log('Created new dashboard window:', dashboardWindowId);
-                        
-                        // Optional: Close the popup after opening dashboard
-                        // window.close();
                     } else {
                         console.error('Failed to create dashboard window');
                         showError('scrape-error-message', 'Failed to open dashboard window');
@@ -299,11 +290,19 @@ async function handleViewDashboard() {
     }
 }
 
-// Project ID Detection Handler
-async function handleDetectProjectId() {
-    console.log('Detect Project ID button clicked');
+// NEW: Handle Scrape Selected Projects
+async function handleScrapeSelectedProjects() {
+    console.log('🎯 Scrape Selected Projects button clicked');
     disableAllButtons();
+    
     try {
+        const token = await getStoredToken();
+        if (!token) {
+            showError('scrape-error-message', 'Please login first');
+            showLoginForm();
+            return;
+        }
+
         // Get current tab
         const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
         if (!tab.url.includes('estimateone.com')) {
@@ -311,7 +310,158 @@ async function handleDetectProjectId() {
             return;
         }
 
-        // Inject content script to detect project ID
+        // Try to inject content script first, then send message
+        try {
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                files: ['content-script.js']
+            });
+            
+            // Small delay to ensure script is loaded
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            showSuccess('scrape-success-message', '🔍 Detecting projects on page...');
+            
+            const detectResponse = await chrome.tabs.sendMessage(tab.id, {
+                action: 'detectAllProjects'
+            });
+
+            if (!detectResponse || !detectResponse.success || detectResponse.projects.length === 0) {
+                showError('scrape-error-message', 'No projects found on this page');
+                return;
+            }
+
+            showSuccess('scrape-success-message', 
+                `✅ Found ${detectResponse.projects.length} projects. Click on projects to select them.`);
+
+            // Show selection overlay
+            await chrome.tabs.sendMessage(tab.id, {
+                action: 'showSelectionOverlay'
+            });
+
+            // Listen for user selection
+            chrome.runtime.onMessage.addListener(handleProjectSelection);
+            
+            showSuccess('scrape-success-message', 
+                '👆 Select projects on the page, then click "Confirm" in the overlay');
+
+        } catch (contentScriptError) {
+            console.error('Content script error:', contentScriptError);
+            showError('scrape-error-message', 'Failed to load project selection interface. Please refresh the page and try again.');
+        }
+
+    } catch (error) {
+        console.error('❌ Error in scrape selected projects:', error);
+        showError('scrape-error-message', 'Failed to initialize project selection');
+    } finally {
+        enableAllButtons();
+    }
+}
+
+// NEW: Handle project selection from content script
+async function handleProjectSelection(request, sender, sendResponse) {
+    if (request.action === 'projectsSelected') {
+        console.log('📋 Projects selected:', request.selectedIds);
+        
+        try {
+            const token = await getStoredToken();
+            if (!token) {
+                showError('scrape-error-message', 'Session expired. Please login again.');
+                return;
+            }
+
+            if (request.selectedIds.length === 0) {
+                showError('scrape-error-message', 'No projects selected');
+                return;
+            }
+
+            // Show progress
+            showSuccess('scrape-success-message', 
+                `🚀 Processing ${request.selectedIds.length} selected projects...`);
+
+            // Process selected projects
+            await processSelectedProjects(request.selectedIds, token);
+
+        } catch (error) {
+            console.error('❌ Error processing selected projects:', error);
+            showError('scrape-error-message', 'Failed to process selected projects');
+        }
+    }
+}
+
+// NEW: Process selected projects
+async function processSelectedProjects(selectedIds, token) {
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (let i = 0; i < selectedIds.length; i++) {
+        const projectId = selectedIds[i];
+        
+        try {
+            showSuccess('scrape-success-message', 
+                `⏳ Processing project ${i + 1}/${selectedIds.length}: ID ${projectId}`);
+
+            // Call your existing scraping API with specific project ID
+            const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/scrapper/scrape-project`, {
+                method: 'POST',
+                headers: {
+                    ...window.ExtensionConfig.getRequestHeaders(),
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ 
+                    project_id: projectId,
+                    url: window.location.href
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.status === 'success') {
+                successCount++;
+                console.log(`✅ Project ${projectId} processed successfully`);
+            } else {
+                errorCount++;
+                console.log(`❌ Project ${projectId} failed:`, data.detail);
+            }
+
+            // Small delay between requests to avoid rate limiting
+            if (i < selectedIds.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+        } catch (error) {
+            errorCount++;
+            console.error(`❌ Network error for project ${projectId}:`, error);
+        }
+    }
+
+    // Show final results
+    if (successCount > 0 && errorCount === 0) {
+        showSuccess('scrape-success-message', 
+            `🎉 Successfully processed all ${successCount} selected projects!`);
+    } else if (successCount > 0 && errorCount > 0) {
+        showSuccess('scrape-success-message', 
+            `✅ Processed ${successCount}/${selectedIds.length} projects. ${errorCount} failed.`);
+    } else {
+        showError('scrape-error-message', 
+            `❌ Failed to process any projects. ${errorCount}/${selectedIds.length} errors.`);
+    }
+
+    // Clean up - remove the message listener
+    chrome.runtime.onMessage.removeListener(handleProjectSelection);
+}
+
+// Project ID Detection Handler
+async function handleDetectProjectId() {
+    console.log('Detect Project ID button clicked');
+    disableAllButtons();
+    try {
+        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+        if (!tab.url.includes('estimateone.com')) {
+            showError('scrape-error-message', 'Please navigate to an EstimateOne page first');
+            return;
+        }
+
         const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             function: detectProjectIdInPage
@@ -332,28 +482,26 @@ async function handleDetectProjectId() {
     }
 }
 
-// UPDATED: Content script function that preserves DOM order (as they appear on page)
+// Content script function for project ID detection
 function detectProjectIdInPage() {
     console.log('🔍 Starting project ID detection...');
     
     // STEP 1: First check if ANY popup is actually open
     const popupSelectors = [
-        '.slide-pane__content', // Main popup container
-        '.ReactModal__Content', // React modal content
-        '[role="dialog"]', // ARIA dialog role
-        '.styles__slider__a65e8ea3f368640c502d', // Specific slider class from your HTML
-        '.ReactModal__Overlay--after-open' // React modal overlay when open
+        '.slide-pane__content',
+        '.ReactModal__Content',
+        '[role="dialog"]',
+        '.styles__slider__a65e8ea3f368640c502d',
+        '.ReactModal__Overlay--after-open'
     ];
 
     let isPopupOpen = false;
     let popupContainer = null;
 
-    // Check each popup selector
     for (const selector of popupSelectors) {
         try {
             const element = document.querySelector(selector);
             if (element) {
-                // Additional check - make sure popup is visible
                 const computedStyle = window.getComputedStyle(element);
                 const isVisible = computedStyle.display !== 'none' &&
                                 computedStyle.visibility !== 'hidden' &&
@@ -376,27 +524,24 @@ function detectProjectIdInPage() {
     if (isPopupOpen && popupContainer) {
         console.log('✅ Popup is open, proceeding with ID detection within popup...');
 
-        // STEP 3: Search for project ID selectors within popup
         const popupProjectIdSelectors = [
-            'span.styles__projectId__f47058b1431204abe7ec', // This was in your working popup logs
-            'span.styles__projectId__a99146050623e131a1bf', // This is for page elements
-            '[class*="projectId"]', // Any class containing "projectId"
-            'span[title*="ID"]' // Span with title containing "ID"
+            'span.styles__projectId__f47058b1431204abe7ec',
+            'span.styles__projectId__a99146050623e131a1bf',
+            '[class*="projectId"]',
+            'span[title*="ID"]'
         ];
         
-        // Try each selector within the popup container
         for (const selector of popupProjectIdSelectors) {
             try {
                 const element = popupContainer.querySelector(selector);
                 if (element && element.textContent) {
                     const text = element.textContent.trim();
                     console.log(`✅ Found element within popup: ${selector}, text: ${text}`);
-                    // Extract just the ID number from text like "ID #169505" or plain "169505"
                     const idMatch = text.match(/(?:ID\s*#?\s*)?(\d+)/i);
                     if (idMatch) {
                         const projectId = idMatch[1];
                         console.log(`🎯 Extracted project ID from popup: ${projectId}`);
-                        return projectId; // Return simple string
+                        return projectId;
                     }
                 }
             } catch (error) {
@@ -405,7 +550,6 @@ function detectProjectIdInPage() {
             }
         }
 
-        // STEP 4: Fallback - Text-based search within popup content
         try {
             const fullText = popupContainer.textContent || popupContainer.innerText;
             const idMatch = fullText.match(/ID\s*#?\s*(\d+)/i);
@@ -418,7 +562,6 @@ function detectProjectIdInPage() {
             console.warn('⚠️ Text-based fallback failed within popup:', error);
         }
 
-        // STEP 5: Final fallback - XPath within popup
         try {
             const xpath = ".//span[contains(text(), 'ID #') or contains(text(), 'ID#') or contains(@class, 'projectId')]";
             const result = document.evaluate(xpath, popupContainer, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
@@ -439,7 +582,7 @@ function detectProjectIdInPage() {
         return null;
     }
 
-    // STEP 6: If no popup is open, fetch ALL project IDs in DOM ORDER (as they appear on page)
+    // STEP 3: If no popup is open, fetch ALL project IDs in DOM ORDER
     console.log('❌ No popup is open - fetching project IDs in DOM ORDER');
     
     const projectIds = [];
@@ -453,11 +596,10 @@ function detectProjectIdInPage() {
         elements.forEach((element, index) => {
             const text = element.textContent?.trim();
             if (text && text.length > 0) {
-                // Extract numeric ID from text
                 const idMatch = text.match(/(\d+)/);
                 if (idMatch) {
                     const projectId = idMatch[1];
-                    if (!projectIds.includes(projectId)) { // Avoid duplicates
+                    if (!projectIds.includes(projectId)) {
                         projectIds.push(projectId);
                         console.log(`📋 Project ID ${projectIds.length} (DOM order): ${projectId}`);
                     }
@@ -465,78 +607,16 @@ function detectProjectIdInPage() {
             }
         });
         
-        // NO SORTING - Keep DOM order exactly as elements appear on page
         console.log(`✅ Successfully extracted ${projectIds.length} unique project IDs in DOM ORDER`);
         console.log('📝 Project IDs in DOM order:', projectIds);
         
-        return projectIds; // Return in original DOM order
+        return projectIds;
         
     } catch (error) {
         console.error('❌ Error extracting project IDs from specific selector:', error);
         return [];
     }
 }
-
-// Helper function that preserves DOM order
-function getProjectIds() {
-    try {
-        const result = detectProjectIdInPage();
-        
-        if (result === null) {
-            console.log('❌ No project IDs found');
-            return null;
-        }
-        
-        if (Array.isArray(result)) {
-            console.log(`✅ Found ${result.length} project IDs in DOM order:`, result.join(', '));
-            return result; // Return exactly as found in DOM
-        } else if (typeof result === 'string') {
-            console.log(`✅ Found single project ID from popup: ${result}`);
-            return result;
-        }
-        
-        return null;
-    } catch (error) {
-        console.error('❌ Error in getProjectIds:', error);
-        return null;
-    }
-}
-
-// Execution function that preserves DOM order
-function executeProjectIdDetection() {
-    console.log('🚀 Starting project ID detection (DOM ORDER)...');
-    
-    const projectIds = getProjectIds();
-    
-    if (projectIds) {
-        if (Array.isArray(projectIds)) {
-            console.log(`📊 Multiple Project IDs found: ${projectIds.length} IDs (DOM ORDER)`);
-            console.log(`📋 IDs as they appear on page:`, projectIds.join(', '));
-            
-            return {
-                type: 'multiple',
-                ids: projectIds,
-                count: projectIds.length,
-                order: 'dom'
-            };
-        } else {
-            console.log(`🎯 Single Project ID from popup: ${projectIds}`);
-            
-            return {
-                type: 'single',
-                id: projectIds
-            };
-        }
-    } else {
-        console.log('❌ No project IDs detected');
-        return null;
-    }
-}
-
-// Execute the detection in DOM order
-const result = executeProjectIdDetection();
-console.log('🏁 Final Result (DOM ORDER):', result);
-
 
 // Authentication Functions
 async function handleLogin() {

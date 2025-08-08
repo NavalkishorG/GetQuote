@@ -3,62 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GetQuote Extension</title>
+    <title>GetQuote Builder</title>
     <link rel="stylesheet" href="style.css">
     <script src="config.js"></script>
 </head>
 <body>
     <div class="popup-wrapper">
+        <h1 class="popup-heading">GetQuote</h1>
         <div class="scroll-container">
-            <h1 class="popup-heading">GetQuote</h1>
             
+            <!-- Loading State -->
+            <div id="loading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Loading...</p>
+            </div>
+
             <!-- Login Form -->
-            <div id="login-form">
-                <p class="description">Sign in to your account</p>
+            <div id="login-form" style="display: none;">
+                <p class="description">Please login to use GetQuote Builder</p>
                 <div id="error-message" class="error" style="display: none;"></div>
-                <input type="text" id="login-email" placeholder="Email">
-                <input type="password" id="login-password" placeholder="Password">
-                <button id="login-btn" class="login">Sign In</button>
-                <button id="show-signup-btn" class="signup">Create Account</button>
+                <input type="text" id="login-email" placeholder="Enter your email">
+                <input type="password" id="login-password" placeholder="Enter your password">
+                <button id="login-btn" class="login">Login</button>
+                <a id="show-signup-btn" class="forgot">Need an account? Sign up</a>
                 <a id="forgot-password" class="forgot">Forgot Password?</a>
             </div>
 
             <!-- Signup Form -->
             <div id="signup-form" style="display: none;">
-                <p class="description">Create your account</p>
+                <p class="description">Create your GetQuote Builder account</p>
                 <div id="signup-error-message" class="error" style="display: none;"></div>
-                <input type="text" id="signup-email" placeholder="Email">
-                <input type="password" id="signup-password" placeholder="Password (min 6 characters)">
+                <input type="text" id="signup-email" placeholder="Enter your email">
+                <input type="password" id="signup-password" placeholder="Choose a password">
                 <button id="signup-btn" class="signup">Create Account</button>
-                <button id="show-login-btn" class="login">Back to Sign In</button>
+                <a id="show-login-btn" class="forgot">Already have an account? Login</a>
             </div>
 
             <!-- Authenticated UI -->
             <div id="authenticated-ui" style="display: none;">
-                <p class="authenticated">Welcome back!</p>
+                <p class="description">Welcome! You can now use GetQuote Builder</p>
                 
-                <div id="credential-status" class="credential-status">
-                    <div id="credential-status-text">Checking credentials...</div>
+                <!-- Credential Status -->
+                <div id="credential-status" class="credential-status not-stored">
+                    <span id="credential-status-text">⚠ EstimateOne credentials not stored</span>
                 </div>
-                
-                <div id="scrape-success-message" class="success" style="display: none;"></div>
-                <div id="scrape-error-message" class="error" style="display: none;"></div>
-                
-                <button id="view-dashboard-btn" class="dashboard-btn">📊 View Dashboard</button>
-                <button id="scrape-tenders-btn" class="scrape-btn">🔍 Scrape Tenders</button>
-                <button id="detect-project-id-btn" class="detect-btn">🔍 Detect Project ID</button>
-                <button id="check-credentials-btn" class="check-btn">✓ Check Credentials</button>
-                <button id="logout-btn" class="logout-btn">Sign Out</button>
-            </div>
 
-            <!-- Loading -->
-            <div id="loading" style="display: none;">
-                <div class="loading-spinner"></div>
-                <p>Please wait...</p>
+                <!-- Error/Success Messages -->
+                <div id="scrape-error-message" class="error" style="display: none;"></div>
+                <div id="scrape-success-message" class="success" style="display: none;"></div>
+
+                <!-- Action Buttons -->
+                <button id="scrape-selected-btn" class="scrape-selected-btn">🎯 Scrape Selected Projects</button>
+                <button id="scrape-tenders-btn" class="scrape-btn">Scrape All Tenders</button>
+                <button id="detect-project-id-btn" class="detect-btn">Detect Project ID</button>
+                <button id="check-credentials-btn" class="check-btn">Check Credentials</button>
+                <button id="view-dashboard-btn" class="dashboard-btn">📊 View Dashboard</button>
+                <button id="logout-btn" class="logout-btn">Logout</button>
             </div>
         </div>
     </div>
-
 
     <script src="script.js"></script>
 </body>

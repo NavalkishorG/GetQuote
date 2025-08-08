@@ -1,0 +1,191 @@
+/* Project Selection Overlay Styles */
+#project-selection-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999999;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.selection-header {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.selection-header h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.selection-controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.selection-controls button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+#select-all-btn {
+    background: #28a745;
+    color: white;
+}
+
+#select-all-btn:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+#clear-all-btn {
+    background: #6c757d;
+    color: white;
+}
+
+#clear-all-btn:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+#confirm-selection-btn {
+    background: #007bff;
+    color: white;
+    font-weight: bold;
+}
+
+#confirm-selection-btn:hover:not(:disabled) {
+    background: #0056b3;
+    transform: translateY(-1px);
+}
+
+#confirm-selection-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+#cancel-selection-btn {
+    background: #dc3545;
+    color: white;
+}
+
+#cancel-selection-btn:hover {
+    background: #c82333;
+    transform: translateY(-1px);
+}
+
+/* Project Selection Indicators */
+.project-selection-indicator {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: white;
+    border: 2px solid #007bff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    min-width: 200px;
+    font-size: 12px;
+}
+
+.selection-checkbox {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.selection-checkbox input[type="checkbox"] {
+    display: none;
+}
+
+.selection-checkbox label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: bold;
+    color: #333;
+}
+
+.checkmark {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #007bff;
+    border-radius: 4px;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: white;
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.selection-checkbox input[type="checkbox"]:checked + label .checkmark {
+    background: #28a745;
+    border-color: #28a745;
+}
+
+.project-info {
+    font-size: 11px;
+    color: #666;
+}
+
+.project-details {
+    margin-top: 4px;
+    line-height: 1.3;
+}
+
+/* Enhanced Project Container Styling */
+[data-project-id] {
+    transition: all 0.3s ease !important;
+    position: relative !important;
+}
+
+[data-project-id]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    #project-selection-overlay {
+        padding: 10px;
+    }
+    
+    .selection-controls {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .selection-controls button {
+        width: 200px;
+        margin: 2px 0;
+    }
+    
+    .project-selection-indicator {
+        position: relative;
+        top: 0;
+        right: 0;
+        margin: 10px 0;
+        min-width: auto;
+        width: 100%;
+    }
+}
