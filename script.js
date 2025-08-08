@@ -332,9 +332,10 @@ async function handleDetectProjectId() {
     }
 }
 
-// UPDATED: Content script function to detect project ID ONLY when popup is open
+// UPDATED: Content script function that preserves DOM order (as they appear on page)
 function detectProjectIdInPage() {
     console.log('🔍 Starting project ID detection...');
+    
     // STEP 1: First check if ANY popup is actually open
     const popupSelectors = [
         '.slide-pane__content', // Main popup container
@@ -371,77 +372,171 @@ function detectProjectIdInPage() {
         }
     }
 
-    // STEP 2: If no popup is open, return null immediately
-    if (!isPopupOpen || !popupContainer) {
-        console.log('❌ No popup is currently open');
-        return null;
-    }
+    // STEP 2: If popup is open, detect project ID within popup
+    if (isPopupOpen && popupContainer) {
+        console.log('✅ Popup is open, proceeding with ID detection within popup...');
 
-    console.log('✅ Popup is open, proceeding with ID detection...');
+        // STEP 3: Search for project ID selectors within popup
+        const popupProjectIdSelectors = [
+            'span.styles__projectId__f47058b1431204abe7ec', // This was in your working popup logs
+            'span.styles__projectId__a99146050623e131a1bf', // This is for page elements
+            '[class*="projectId"]', // Any class containing "projectId"
+            'span[title*="ID"]' // Span with title containing "ID"
+        ];
+        
+        // Try each selector within the popup container
+        for (const selector of popupProjectIdSelectors) {
+            try {
+                const element = popupContainer.querySelector(selector);
+                if (element && element.textContent) {
+                    const text = element.textContent.trim();
+                    console.log(`✅ Found element within popup: ${selector}, text: ${text}`);
+                    // Extract just the ID number from text like "ID #169505" or plain "169505"
+                    const idMatch = text.match(/(?:ID\s*#?\s*)?(\d+)/i);
+                    if (idMatch) {
+                        const projectId = idMatch[1];
+                        console.log(`🎯 Extracted project ID from popup: ${projectId}`);
+                        return projectId; // Return simple string
+                    }
+                }
+            } catch (error) {
+                console.warn(`⚠️ Selector failed within popup: ${selector}`, error);
+                continue;
+            }
+        }
 
-    // STEP 3: Only search for project ID within the open popup container
-    const selectors = [
-        '.styles__projectId__f47058b1431204abe7ec', // Direct class selector (most reliable)
-        '[class*="projectId"]', // Any class containing "projectId"
-        'span[title*="ID"]', // Span with title containing "ID"
-        '#project-slider-header .styles__projectId__f47058b1431204abe7ec', // ID-based selector
-    ];
-
-    // Try each selector ONLY within the popup container
-    for (const selector of selectors) {
+        // STEP 4: Fallback - Text-based search within popup content
         try {
-            // Search within the popup container, not the entire document
-            const element = popupContainer.querySelector(selector);
-            if (element && element.textContent) {
-                const text = element.textContent.trim();
-                console.log(`✅ Found element within popup: ${selector}, text: ${text}`);
-                // Extract just the ID number from text like "ID #169451"
+            const fullText = popupContainer.textContent || popupContainer.innerText;
+            const idMatch = fullText.match(/ID\s*#?\s*(\d+)/i);
+            if (idMatch) {
+                const projectId = idMatch[1];
+                console.log(`🎯 Found project ID via text search within popup: ${projectId}`);
+                return projectId;
+            }
+        } catch (error) {
+            console.warn('⚠️ Text-based fallback failed within popup:', error);
+        }
+
+        // STEP 5: Final fallback - XPath within popup
+        try {
+            const xpath = ".//span[contains(text(), 'ID #') or contains(text(), 'ID#') or contains(@class, 'projectId')]";
+            const result = document.evaluate(xpath, popupContainer, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+            if (result.singleNodeValue) {
+                const text = result.singleNodeValue.textContent.trim();
                 const idMatch = text.match(/(?:ID\s*#?\s*)?(\d+)/i);
                 if (idMatch) {
                     const projectId = idMatch[1];
-                    console.log(`🎯 Extracted project ID from popup: ${projectId}`);
+                    console.log(`🎯 Found project ID via XPath within popup: ${projectId}`);
                     return projectId;
                 }
             }
         } catch (error) {
-            console.warn(`⚠️ Selector failed within popup: ${selector}`, error);
-            continue;
+            console.warn('⚠️ XPath fallback failed within popup:', error);
         }
+
+        console.log('❌ No project ID found within the open popup');
+        return null;
     }
 
-    // STEP 4: Fallback - Text-based search ONLY within popup content
+    // STEP 6: If no popup is open, fetch ALL project IDs in DOM ORDER (as they appear on page)
+    console.log('❌ No popup is open - fetching project IDs in DOM ORDER');
+    
+    const projectIds = [];
+    const specificSelector = 'span.styles__projectId__a99146050623e131a1bf';
+    
     try {
-        const fullText = popupContainer.textContent || popupContainer.innerText;
-        const idMatch = fullText.match(/ID\s*#?\s*(\d+)/i);
-        if (idMatch) {
-            const projectId = idMatch[1];
-            console.log(`🎯 Found project ID via text search within popup: ${projectId}`);
-            return projectId;
-        }
-    } catch (error) {
-        console.warn('⚠️ Text-based fallback failed within popup:', error);
-    }
-
-    // STEP 5: Final fallback - XPath ONLY within popup
-    try {
-        const xpath = ".//span[contains(text(), 'ID #') or contains(text(), 'ID#')]";
-        const result = document.evaluate(xpath, popupContainer, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-        if (result.singleNodeValue) {
-            const text = result.singleNodeValue.textContent.trim();
-            const idMatch = text.match(/ID\s*#?\s*(\d+)/i);
-            if (idMatch) {
-                const projectId = idMatch[1];
-                console.log(`🎯 Found project ID via XPath within popup: ${projectId}`);
-                return projectId;
+        console.log(`🔍 Searching with selector: ${specificSelector}`);
+        const elements = document.querySelectorAll(specificSelector);
+        console.log(`🔍 Found ${elements.length} elements with selector: ${specificSelector}`);
+        
+        elements.forEach((element, index) => {
+            const text = element.textContent?.trim();
+            if (text && text.length > 0) {
+                // Extract numeric ID from text
+                const idMatch = text.match(/(\d+)/);
+                if (idMatch) {
+                    const projectId = idMatch[1];
+                    if (!projectIds.includes(projectId)) { // Avoid duplicates
+                        projectIds.push(projectId);
+                        console.log(`📋 Project ID ${projectIds.length} (DOM order): ${projectId}`);
+                    }
+                }
             }
-        }
+        });
+        
+        // NO SORTING - Keep DOM order exactly as elements appear on page
+        console.log(`✅ Successfully extracted ${projectIds.length} unique project IDs in DOM ORDER`);
+        console.log('📝 Project IDs in DOM order:', projectIds);
+        
+        return projectIds; // Return in original DOM order
+        
     } catch (error) {
-        console.warn('⚠️ XPath fallback failed within popup:', error);
+        console.error('❌ Error extracting project IDs from specific selector:', error);
+        return [];
     }
-
-    console.log('❌ No project ID found within the open popup');
-    return null;
 }
+
+// Helper function that preserves DOM order
+function getProjectIds() {
+    try {
+        const result = detectProjectIdInPage();
+        
+        if (result === null) {
+            console.log('❌ No project IDs found');
+            return null;
+        }
+        
+        if (Array.isArray(result)) {
+            console.log(`✅ Found ${result.length} project IDs in DOM order:`, result.join(', '));
+            return result; // Return exactly as found in DOM
+        } else if (typeof result === 'string') {
+            console.log(`✅ Found single project ID from popup: ${result}`);
+            return result;
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('❌ Error in getProjectIds:', error);
+        return null;
+    }
+}
+
+// Execution function that preserves DOM order
+function executeProjectIdDetection() {
+    console.log('🚀 Starting project ID detection (DOM ORDER)...');
+    
+    const projectIds = getProjectIds();
+    
+    if (projectIds) {
+        if (Array.isArray(projectIds)) {
+            console.log(`📊 Multiple Project IDs found: ${projectIds.length} IDs (DOM ORDER)`);
+            console.log(`📋 IDs as they appear on page:`, projectIds.join(', '));
+            
+            return {
+                type: 'multiple',
+                ids: projectIds,
+                count: projectIds.length,
+                order: 'dom'
+            };
+        } else {
+            console.log(`🎯 Single Project ID from popup: ${projectIds}`);
+            
+            return {
+                type: 'single',
+                id: projectIds
+            };
+        }
+    } else {
+        console.log('❌ No project IDs detected');
+        return null;
+    }
+}
+
+// Execute the detection in DOM order
+const result = executeProjectIdDetection();
+console.log('🏁 Final Result (DOM ORDER):', result);
+
 
 // Authentication Functions
 async function handleLogin() {
