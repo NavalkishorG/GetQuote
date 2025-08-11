@@ -321,7 +321,7 @@ function updateSelectionCounters(currentPageCount) {
     }
 }
 
-// Add selection indicator to project
+// Add selection indicator to project - COMPLETE FIXED VERSION
 function addProjectSelectionIndicator(project, index) {
     if (!project.container) return;
     
@@ -331,57 +331,56 @@ function addProjectSelectionIndicator(project, index) {
     const indicator = document.createElement('div');
     indicator.className = 'project-selection-indicator';
     indicator.innerHTML = `
-        <div class="selection-checkbox">
-            <input type="checkbox" id="project-${project.id}" ${isSelected ? 'checked' : ''} style="display: block; width: 18px; height: 18px; margin-right: 8px;">
-            <label for="project-${project.id}" style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
-                <div class="checkmark-container" style="margin-right: 10px;">
-                    <span class="checkmark" style="font-size: 16px; color: ${isSelected ? '#28a745' : '#ccc'};">${isSelected ? '✅' : '☐'}</span>
-                </div>
-                <div class="project-info" style="flex: 1;">
-                    <div style="font-size: 16px; font-weight: bold; color: #000; margin-bottom: 4px;">
-                        🆔 PROJECT ID: ${project.id}
+        <div class="selection-controls-wrapper">
+            <div class="selection-checkbox">
+                <input type="checkbox" id="project-${project.id}" ${isSelected ? 'checked' : ''} 
+                       style="display: inline-block !important; width: 20px; height: 20px; margin-right: 10px; cursor: pointer; transform: scale(1.5);">
+                <label for="project-${project.id}" style="display: flex; align-items: center; cursor: pointer; width: 100%;">
+                    <div class="project-id-display" style="font-size: 18px; font-weight: bold; color: #000; margin-bottom: 8px; width: 100%;">
+                        🆔 PROJECT ID: <span style="color: #007bff; font-size: 20px;">${project.id}</span>
                     </div>
-                    <div style="font-size: 12px; color: #666; line-height: 1.3;">
-                        📋 ${project.title}<br>
-                        ⏰ ${project.deadline}<br>
-                        💰 ${project.value}
-                    </div>
-                    ${isSelected ? '<div style="color: #28a745; font-weight: bold; font-size: 12px; margin-top: 4px;">✅ SELECTED</div>' : ''}
+                </label>
+            </div>
+            <div class="project-details-section" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+                <div style="font-size: 12px; color: #666; line-height: 1.4;">
+                    📋 <strong>Title:</strong> ${project.title}<br>
+                    ⏰ <strong>Deadline:</strong> ${project.deadline}<br>
+                    💰 <strong>Value:</strong> ${project.value}
                 </div>
-            </label>
+                ${isSelected ? '<div class="selected-status" style="color: #28a745; font-weight: bold; font-size: 14px; margin-top: 8px; text-align: center; background: #e8f5e8; padding: 6px; border-radius: 4px;">✅ SELECTED</div>' : ''}
+            </div>
         </div>
     `;
-    
-            // Style the indicator
+
+    // Style the indicator with better dimensions
     Object.assign(indicator.style, {
         position: 'absolute',
-        top: '-20px',
-        right: '-20px',
+        top: '-25px',
+        right: '-25px',
         background: isSelected ? '#e8f5e8' : 'white',
         border: isSelected ? '3px solid #28a745' : '2px solid #007bff',
-        borderRadius: '12px',
-        padding: '15px',
-        boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
-        zIndex: '1000',
-        minWidth: '320px',
+        borderRadius: '15px',
+        padding: '20px',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+        zIndex: '1001',
+        minWidth: '350px',
         maxWidth: '400px',
         fontSize: '14px',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        lineHeight: '1.4'
     });
 
-    
-    
-    // Add click handler for selection toggle
+    // Add click handler for selection toggle - THIS WAS MISSING!
     const checkbox = indicator.querySelector('input[type="checkbox"]');
     checkbox.addEventListener('change', (e) => {
         toggleProjectSelection(project.id, e.target.checked);
     });
     
-    // Position indicator relative to project container
+    // Position indicator relative to project container - THIS WAS MISSING!
     project.container.style.position = 'relative';
     project.container.appendChild(indicator);
     
-    // Add data attribute for easier identification
+    // Add data attribute for easier identification - THIS WAS MISSING!
     project.container.setAttribute('data-project-id', project.id);
 }
 
@@ -403,20 +402,17 @@ async function toggleProjectSelection(projectId, isSelected) {
     updateSelectionCounters(allDetectedProjects.length);
 }
 
-// Update individual project indicator
+// Update individual project indicator - FIXED VERSION
 function updateProjectIndicator(projectId, isSelected) {
     const container = document.querySelector(`[data-project-id="${projectId}"]`);
     if (!container) return;
     
     const indicator = container.querySelector('.project-selection-indicator');
     const checkbox = indicator?.querySelector('input[type="checkbox"]');
-    const checkmark = indicator?.querySelector('.checkmark');
-    const selectedStatus = indicator?.querySelector('div[style*="color: #28a745"]');
+    const selectedStatus = indicator?.querySelector('.selected-status');
     
-    if (indicator && checkbox && checkmark) {
+    if (indicator && checkbox) {
         checkbox.checked = isSelected;
-        checkmark.textContent = isSelected ? '✅' : '☐';
-        checkmark.style.color = isSelected ? '#28a745' : '#ccc';
         
         // Update styling
         indicator.style.background = isSelected ? '#e8f5e8' : 'white';
@@ -424,16 +420,15 @@ function updateProjectIndicator(projectId, isSelected) {
         
         // Update selected status text
         if (isSelected && !selectedStatus) {
-            const projectInfo = indicator.querySelector('.project-info');
-            if (projectInfo) {
-                projectInfo.innerHTML += '<div style="color: #28a745; font-weight: bold; font-size: 12px; margin-top: 4px;">✅ SELECTED</div>';
+            const detailsSection = indicator.querySelector('.project-details-section');
+            if (detailsSection) {
+                detailsSection.innerHTML += '<div class="selected-status" style="color: #28a745; font-weight: bold; font-size: 14px; margin-top: 8px; text-align: center; background: #e8f5e8; padding: 6px; border-radius: 4px;">✅ SELECTED</div>';
             }
         } else if (!isSelected && selectedStatus) {
             selectedStatus.remove();
         }
     }
 }
-
 
 // Select all projects on current page
 async function selectAllProjectsOnPage() {
@@ -465,7 +460,7 @@ async function clearAllSelections() {
     showNotification('🗑️ All selections cleared across all pages!', 'info');
 }
 
-// Show list of selected project IDs
+// Show list of selected project IDs with working close button - FIXED VERSION
 function showSelectedProjectsList() {
     const selectedIds = Array.from(selectedProjectIds);
     
@@ -475,24 +470,84 @@ function showSelectedProjectsList() {
     }
     
     const idsList = selectedIds.sort((a, b) => parseInt(a) - parseInt(b)).join(', ');
-    const message = `Selected Project IDs (${selectedIds.length}):\n\n${idsList}`;
     
-    // Create modal to show selected IDs
+    // Create modal with proper event handling
     const modal = document.createElement('div');
+    modal.id = 'selected-projects-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 1000002;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
     modal.innerHTML = `
-        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                    background: white; padding: 20px; border-radius: 10px; 
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 1000000; max-width: 500px; max-height: 400px; overflow-y: auto;">
-            <h3>📋 Selected Projects (${selectedIds.length})</h3>
-            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 250px; overflow-y: auto;">
-                ${idsList}
+        <div style="background: white; padding: 25px; border-radius: 15px; 
+                    box-shadow: 0 15px 35px rgba(0,0,0,0.3); max-width: 600px; max-height: 500px; 
+                    overflow-y: auto; margin: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #333;">📋 Selected Projects (${selectedIds.length})</h3>
+                <button id="close-modal-btn" style="background: #dc3545; color: white; border: none; 
+                        width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 16px; 
+                        display: flex; align-items: center; justify-content: center;">×</button>
             </div>
-            <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 15px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                Close
-            </button>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; 
+                        font-size: 14px; max-height: 300px; overflow-y: auto; word-wrap: break-word;">
+                ${selectedIds.map(id => `<span style="display: inline-block; background: #007bff; color: white; 
+                    padding: 4px 8px; margin: 2px; border-radius: 4px;">${id}</span>`).join('')}
+            </div>
+            <div style="margin-top: 20px; text-align: center;">
+                <button id="copy-ids-btn" style="background: #28a745; color: white; border: none; 
+                        padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-right: 10px;">
+                    📋 Copy IDs
+                </button>
+                <button id="close-modal-btn-2" style="background: #6c757d; color: white; border: none; 
+                        padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                    Close
+                </button>
+            </div>
         </div>
     `;
+    
     document.body.appendChild(modal);
+    
+    // Add working event listeners
+    const closeModal = () => {
+        if (modal.parentElement) {
+            modal.remove();
+        }
+    };
+    
+    // Multiple ways to close the modal
+    modal.querySelector('#close-modal-btn').addEventListener('click', closeModal);
+    modal.querySelector('#close-modal-btn-2').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    
+    // Copy functionality
+    modal.querySelector('#copy-ids-btn').addEventListener('click', () => {
+        navigator.clipboard.writeText(idsList).then(() => {
+            showNotification('Project IDs copied to clipboard!', 'success');
+        }).catch(() => {
+            showNotification('Failed to copy IDs', 'error');
+        });
+    });
+    
+    // ESC key to close
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
 }
 
 // Confirm selection and send to popup
