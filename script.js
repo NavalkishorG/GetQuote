@@ -202,8 +202,6 @@ function attachAuthenticatedEventListeners() {
     const logoutBtn = document.getElementById('logout-btn');
     const scrapeTendersBtn = document.getElementById('scrape-tenders-btn');
     const scrapeSelectedBtn = document.getElementById('scrape-selected-btn');
-    const checkCredentialsBtn = document.getElementById('check-credentials-btn');
-    const detectProjectIdBtn = document.getElementById('detect-project-id-btn');
     const viewDashboardBtn = document.getElementById('view-dashboard-btn');
 
     if (logoutBtn) {
@@ -222,15 +220,7 @@ function attachAuthenticatedEventListeners() {
         document.getElementById('scrape-selected-btn').addEventListener('click', handleScrapeSelectedProjects);
     }
 
-    if (checkCredentialsBtn) {
-        checkCredentialsBtn.replaceWith(checkCredentialsBtn.cloneNode(true));
-        document.getElementById('check-credentials-btn').addEventListener('click', handleCheckCredentials);
-    }
-
-    if (detectProjectIdBtn) {
-        detectProjectIdBtn.replaceWith(detectProjectIdBtn.cloneNode(true));
-        document.getElementById('detect-project-id-btn').addEventListener('click', handleDetectProjectId);
-    }
+    
 
     if (viewDashboardBtn) {
         viewDashboardBtn.replaceWith(viewDashboardBtn.cloneNode(true));
@@ -516,172 +506,6 @@ async function processSelectedProjects(selectedIds, token) {
     chrome.runtime.onMessage.removeListener(handleProjectSelection);
 }
 
-// Project ID Detection Handler
-async function handleDetectProjectId() {
-    console.log('Detect Project ID button clicked');
-    disableAllButtons();
-    try {
-        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-        if (!tab.url.includes('estimateone.com')) {
-            showError('scrape-error-message', 'Please navigate to an EstimateOne page first');
-            return;
-        }
-
-        const results = await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            function: detectProjectIdInPage
-        });
-
-        const projectId = results[0].result;
-        if (projectId) {
-            showSuccess('scrape-success-message', `ID = ${projectId}`);
-        } else {
-            showError('scrape-error-message', 'No popup');
-        }
-
-    } catch (error) {
-        console.error('Project ID detection error:', error);
-        showError('scrape-error-message', 'Failed to detect project ID');
-    } finally {
-        enableAllButtons();
-    }
-}
-
-// Content script function for project ID detection
-function detectProjectIdInPage() {
-    console.log('🔍 Starting project ID detection...');
-    
-    // STEP 1: First check if ANY popup is actually open
-    const popupSelectors = [
-        '.slide-pane__content',
-        '.ReactModal__Content',
-        '[role="dialog"]',
-        '.styles__slider__a65e8ea3f368640c502d',
-        '.ReactModal__Overlay--after-open'
-    ];
-
-    let isPopupOpen = false;
-    let popupContainer = null;
-
-    for (const selector of popupSelectors) {
-        try {
-            const element = document.querySelector(selector);
-            if (element) {
-                const computedStyle = window.getComputedStyle(element);
-                const isVisible = computedStyle.display !== 'none' &&
-                                computedStyle.visibility !== 'hidden' &&
-                                computedStyle.opacity !== '0';
-
-                if (isVisible) {
-                    console.log(`✅ Found open popup with selector: ${selector}`);
-                    isPopupOpen = true;
-                    popupContainer = element;
-                    break;
-                }
-            }
-        } catch (error) {
-            console.warn(`⚠️ Popup check failed for selector: ${selector}`, error);
-            continue;
-        }
-    }
-
-    // STEP 2: If popup is open, detect project ID within popup
-    if (isPopupOpen && popupContainer) {
-        console.log('✅ Popup is open, proceeding with ID detection within popup...');
-
-        const popupProjectIdSelectors = [
-            'span.styles__projectId__f47058b1431204abe7ec',
-            'span.styles__projectId__a99146050623e131a1bf',
-            '[class*="projectId"]',
-            'span[title*="ID"]'
-        ];
-        
-        for (const selector of popupProjectIdSelectors) {
-            try {
-                const element = popupContainer.querySelector(selector);
-                if (element && element.textContent) {
-                    const text = element.textContent.trim();
-                    console.log(`✅ Found element within popup: ${selector}, text: ${text}`);
-                    const idMatch = text.match(/(?:ID\s*#?\s*)?(\d+)/i);
-                    if (idMatch) {
-                        const projectId = idMatch[1];
-                        console.log(`🎯 Extracted project ID from popup: ${projectId}`);
-                        return projectId;
-                    }
-                }
-            } catch (error) {
-                console.warn(`⚠️ Selector failed within popup: ${selector}`, error);
-                continue;
-            }
-        }
-
-        try {
-            const fullText = popupContainer.textContent || popupContainer.innerText;
-            const idMatch = fullText.match(/ID\s*#?\s*(\d+)/i);
-            if (idMatch) {
-                const projectId = idMatch[1];
-                console.log(`🎯 Found project ID via text search within popup: ${projectId}`);
-                return projectId;
-            }
-        } catch (error) {
-            console.warn('⚠️ Text-based fallback failed within popup:', error);
-        }
-
-        try {
-            const xpath = ".//span[contains(text(), 'ID #') or contains(text(), 'ID#') or contains(@class, 'projectId')]";
-            const result = document.evaluate(xpath, popupContainer, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-            if (result.singleNodeValue) {
-                const text = result.singleNodeValue.textContent.trim();
-                const idMatch = text.match(/(?:ID\s*#?\s*)?(\d+)/i);
-                if (idMatch) {
-                    const projectId = idMatch[1];
-                    console.log(`🎯 Found project ID via XPath within popup: ${projectId}`);
-                    return projectId;
-                }
-            }
-        } catch (error) {
-            console.warn('⚠️ XPath fallback failed within popup:', error);
-        }
-
-        console.log('❌ No project ID found within the open popup');
-        return null;
-    }
-
-    // STEP 3: If no popup is open, fetch ALL project IDs in DOM ORDER
-    console.log('❌ No popup is open - fetching project IDs in DOM ORDER');
-    
-    const projectIds = [];
-    const specificSelector = 'span.styles__projectId__a99146050623e131a1bf';
-    
-    try {
-        console.log(`🔍 Searching with selector: ${specificSelector}`);
-        const elements = document.querySelectorAll(specificSelector);
-        console.log(`🔍 Found ${elements.length} elements with selector: ${specificSelector}`);
-        
-        elements.forEach((element, index) => {
-            const text = element.textContent?.trim();
-            if (text && text.length > 0) {
-                const idMatch = text.match(/(\d+)/);
-                if (idMatch) {
-                    const projectId = idMatch[1];
-                    if (!projectIds.includes(projectId)) {
-                        projectIds.push(projectId);
-                        console.log(`📋 Project ID ${projectIds.length} (DOM order): ${projectId}`);
-                    }
-                }
-            }
-        });
-        
-        console.log(`✅ Successfully extracted ${projectIds.length} unique project IDs in DOM ORDER`);
-        console.log('📝 Project IDs in DOM order:', projectIds);
-        
-        return projectIds;
-        
-    } catch (error) {
-        console.error('❌ Error extracting project IDs from specific selector:', error);
-        return [];
-    }
-}
 
 // Authentication Functions
 async function handleLogin() {
@@ -842,57 +666,7 @@ async function handleLogout() {
     }
 }
 
-async function handleCheckCredentials() {
-    console.log('Check credentials button clicked');
-    disableAllButtons();
-    try {
-        const token = await getStoredToken();
-        if (!token) {
-            showError('scrape-error-message', 'Please login first');
-            showLoginForm();
-            return;
-        }
 
-        console.log('Checking credentials status...');
-        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/credentials/status`, {
-            headers: {
-                ...window.ExtensionConfig.getRequestHeaders(),
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
-        console.log('Credentials status:', data);
-
-        if (data.credentials_stored) {
-            showSuccess('scrape-success-message', data.message);
-            updateCredentialStatus({ credentials_stored: true });
-        } else {
-            showError('scrape-error-message', data.message);
-            updateCredentialStatus({ credentials_stored: false });
-        }
-    } catch (error) {
-        console.error('Credential check error:', error);
-        const token = await getStoredToken();
-        if (token) {
-            try {
-                const user = await verifyToken(token);
-                if (user) {
-                    showAuthenticatedUI(user);
-                } else {
-                    showLoginForm();
-                }
-            } catch {
-                showLoginForm();
-            }
-        } else {
-            showLoginForm();
-        }
-        showError('scrape-error-message', 'Failed to check credential status');
-    } finally {
-        enableAllButtons();
-    }
-}
 
 async function handleScrapeTenders() {
     console.log('Scrape tenders button clicked');

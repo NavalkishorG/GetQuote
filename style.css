@@ -124,14 +124,7 @@ button.scrape-btn:hover {
     background-color: #e55a31;
 }
 
-button.check-btn {
-    background-color: #2196f3;
-    color: white;
-}
 
-button.check-btn:hover {
-    background-color: #1976d2;
-}
 
 button.logout-btn {
     background-color: #9e9e9e;
@@ -142,14 +135,6 @@ button.logout-btn:hover {
     background-color: #757575;
 }
 
-button.detect-btn {
-    background-color: #9c27b0;
-    color: white;
-}
-
-button.detect-btn:hover {
-    background-color: #7b1fa2;
-}
 
 /* Dashboard Button - Keep only this dashboard-related style */
 button.dashboard-btn {
