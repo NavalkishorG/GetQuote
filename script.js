@@ -216,7 +216,7 @@ function attachAuthenticatedEventListeners() {
         document.getElementById('scrape-tenders-btn').addEventListener('click', handleScrapeTenders);
     }
 
-    // Updated: Scrape Selected Projects button for multi-selection and popup scenarios
+    // Scrape Selected Projects button - now primarily for popup detection
     if (scrapeSelectedBtn) {
         scrapeSelectedBtn.replaceWith(scrapeSelectedBtn.cloneNode(true));
         document.getElementById('scrape-selected-btn').addEventListener('click', handleScrapeSelectedProjects);
@@ -254,110 +254,6 @@ async function clearStoredSelectedIds() {
             resolve();
         });
     });
-}
-
-// Enhanced message listener
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'storeSelectedIds') {
-        storeSelectedIds(request.selectedIds);
-        sendResponse({success: true});
-    } else if (request.action === 'projectsSelected') {
-        handleProjectSelection(request, sender, sendResponse);
-        sendResponse({success: true});
-    } 
-    // NEW: Handle immediate processing from confirm button
-    else if (request.action === 'processSelectedProjectsNow') {
-        handleImmediateProcessing(request.selectedIds);
-        sendResponse({success: true});
-    }
-});
-
-// NEW: Handle immediate processing when confirm button is clicked
-async function handleImmediateProcessing(selectedIds) {
-    console.log('🚀 IMMEDIATE PROCESSING triggered by confirm button:', selectedIds);
-    
-    try {
-        const token = await getStoredToken();
-        if (!token) {
-            showError('scrape-error-message', 'Session expired. Please login again.');
-            showLoginForm();
-            return;
-        }
-
-        if (selectedIds.length === 0) {
-            showError('scrape-error-message', 'No projects selected');
-            return;
-        }
-
-        // Show progress in popup
-        showSuccess('scrape-success-message', 
-            `🚀 Processing ${selectedIds.length} selected projects from confirm button...`);
-
-        // Process the selected projects immediately
-        await processSelectedProjectsImmediate(selectedIds, token);
-        
-        // Clear stored IDs after successful processing
-        await clearStoredSelectedIds();
-        
-        // Clear selection in content script
-        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-        if (tab) {
-            chrome.tabs.sendMessage(tab.id, { action: 'clearStoredSelection' });
-        }
-        
-    } catch (error) {
-        console.error('❌ Error in immediate processing:', error);
-        showError('scrape-error-message', 'Failed to process selected projects');
-    }
-}
-
-// NEW: Immediate processing function
-async function processSelectedProjectsImmediate(selectedIds, token) {
-    console.log('🔥 IMMEDIATE FRONTEND PROCESSING SELECTED PROJECTS');
-    console.log('📤 Sending project IDs:', selectedIds);
-
-    try {
-        showSuccess('scrape-success-message', 
-            `🚀 Processing ${selectedIds.length} selected projects...`);
-
-        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/scrapper/scrape-project`, {
-            method: 'POST',
-            headers: {
-                ...window.ExtensionConfig.getRequestHeaders(),
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                project_ids: selectedIds, // Send as array with stringify
-                url: "https://app.estimateone.com/tenders"
-            })
-        });
-
-        const data = await response.json();
-        console.log('📥 IMMEDIATE BACKEND RESPONSE:', data);
-
-        if (response.ok) {
-            const processed = data.data?.processed || 0;
-            const failed = data.data?.failed || 0;
-            const total = selectedIds.length;
-
-            if (data.status === 'success' && processed === total) {
-                showSuccess('scrape-success-message', 
-                    `🎉 Successfully processed all ${processed} selected projects via confirm button!`);
-            } else if (data.status === 'partial_success' || (processed > 0 && failed > 0)) {
-                showSuccess('scrape-success-message', 
-                    `✅ Processed ${processed}/${total} projects via confirm button. ${failed} failed.`);
-            } else {
-                showError('scrape-error-message', 
-                    `❌ Failed to process projects: ${data.message || 'Unknown error'}`);
-            }
-        } else {
-            showError('scrape-error-message', 
-                `❌ Failed to process projects: ${data.detail || data.message || 'Server error'}`);
-        }
-    } catch (error) {
-        console.error('❌ Network error processing projects:', error);
-        showError('scrape-error-message', '❌ Network error. Please try again.');
-    }
 }
 
 // Dashboard Functions
@@ -411,7 +307,7 @@ async function handleViewDashboard() {
     }
 }
 
-// UPDATED: Handle Scrape Selected Projects - only for popup detection, multi-selection moved to overlay
+// SIMPLIFIED: Handle Scrape Selected Projects - popup detection and multi-selection overlay
 async function handleScrapeSelectedProjects() {
     console.log('🎯 Scrape Selected Projects button clicked');
     disableAllButtons();
@@ -428,15 +324,6 @@ async function handleScrapeSelectedProjects() {
         const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
         if (!tab.url.includes('estimateone.com')) {
             showError('scrape-error-message', 'Please navigate to an EstimateOne page first');
-            return;
-        }
-
-        // Check for stored IDs first (fallback)
-        const storedIds = await getStoredSelectedIds();
-        if (storedIds && storedIds.length > 0) {
-            console.log('✅ Found stored project IDs:', storedIds);
-            await processSelectedProjectsImmediate(storedIds, token);
-            await clearStoredSelectedIds();
             return;
         }
 
@@ -478,7 +365,7 @@ async function handleScrapeSelectedProjects() {
                 }
 
                 showSuccess('scrape-success-message', 
-                    `✅ Found ${detectResponse.projects.length} projects. Click on projects to select them, then click "Confirm & Process".`);
+                    `✅ Found ${detectResponse.projects.length} projects. Click on projects to select them, then click "Confirm & Process" in the overlay.`);
                 
                 await sendMessageWithRetry(tab.id, {
                     action: 'showSelectionOverlay'
@@ -545,42 +432,6 @@ async function processSingleProject(projectId, token) {
     } catch (error) {
         console.error(`❌ Error processing single project ${projectId}:`, error);
         showError('scrape-error-message', `❌ Failed to process project ${projectId}`);
-    }
-}
-
-// Handle project selection from content script (fallback)
-async function handleProjectSelection(request, sender, sendResponse) {
-    if (request.action === 'projectsSelected') {
-        console.log('📋 Projects selected:', request.selectedIds);
-        
-        try {
-            const token = await getStoredToken();
-            if (!token) {
-                showError('scrape-error-message', 'Session expired. Please login again.');
-                return;
-            }
-
-            if (request.selectedIds.length === 0) {
-                showError('scrape-error-message', 'No projects selected');
-                return;
-            }
-
-            // Store selected IDs
-            await storeSelectedIds(request.selectedIds);
-            
-            // Show progress
-            showSuccess('scrape-success-message', 
-                `🚀 Processing ${request.selectedIds.length} selected projects...`);
-
-            // Process selected projects
-            await processSelectedProjectsImmediate(request.selectedIds, token);
-            
-            // Clear stored IDs after processing
-            await clearStoredSelectedIds();
-        } catch (error) {
-            console.error('❌ Error processing selected projects:', error);
-            showError('scrape-error-message', 'Failed to process selected projects');
-        }
     }
 }
 
@@ -733,7 +584,7 @@ async function handleLogout() {
         }
 
         await clearStoredToken();
-        await clearStoredSelectedIds(); // Also clear any stored project selections
+        await clearStoredSelectedIds();
         
         console.log('Token cleared, showing login form');
         setTimeout(() => {

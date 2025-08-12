@@ -5,6 +5,14 @@ let allDetectedProjects = [];
 let overlayActive = false;
 let selectionSessionId = null;
 
+// Extension configuration - replace with your actual API URL
+const EXTENSION_CONFIG = {
+    API_BASE_URL: 'http://localhost:8000', // Replace with your actual backend URL
+    getRequestHeaders: () => ({
+        'Content-Type': 'application/json'
+    })
+};
+
 initializeSelectionSession();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -97,6 +105,15 @@ function clearStoredSelection() {
             row.classList.remove('project-row-selected');
         });
         updateOverlayStatus();
+    });
+}
+
+// Get auth token from storage
+async function getAuthToken() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['auth_token'], (result) => {
+            resolve(result.auth_token);
+        });
     });
 }
 
@@ -364,6 +381,11 @@ function showProjectSelectionOverlay() {
                 transform: none;
             }
             
+            .confirm-btn.processing {
+                background: #ff9800;
+                cursor: not-allowed;
+            }
+            
             .clear-btn {
                 background: #f44336;
                 color: white;
@@ -423,6 +445,18 @@ function showProjectSelectionOverlay() {
             .status-waiting {
                 background: #ff9800;
                 color: white;
+            }
+            
+            .status-processing {
+                background: #2196F3;
+                color: white;
+                animation: pulse 1.5s infinite;
+            }
+            
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.5; }
+                100% { opacity: 1; }
             }
         </style>
         
@@ -488,25 +522,169 @@ function updateOverlayStatus() {
     }
 }
 
-// Handle confirm and process button click
+// UPDATED: Handle confirm and process button click - DIRECT API CALL
 async function handleConfirmProcess() {
     const selectedIds = Array.from(selectedProjectIds);
     
     if (selectedIds.length === 0) {
-        alert('No projects selected!');
+        showTemporaryNotification('❌ No projects selected!', 3000);
         return;
     }
 
     console.log('🚀 Confirm & Process clicked with IDs:', selectedIds);
     
-    // Send message to popup to process these IDs immediately
-    chrome.runtime.sendMessage({
-        action: 'processSelectedProjectsNow',
-        selectedIds: selectedIds
-    });
+    // Update UI to show processing state
+    const confirmButton = document.getElementById('confirm-process-btn');
+    const statusElement = document.getElementById('selection-status');
     
-    // Hide overlay
-    hideProjectSelectionOverlay();
+    if (confirmButton) {
+        confirmButton.disabled = true;
+        confirmButton.classList.add('processing');
+        confirmButton.innerHTML = '⏳ Processing...';
+    }
+    
+    if (statusElement) {
+        statusElement.textContent = '🔄 Processing...';
+        statusElement.className = 'status-indicator status-processing';
+    }
+    
+    try {
+        // Get auth token from storage
+        const token = await getAuthToken();
+        
+        if (!token) {
+            showTemporaryNotification('❌ Please login first', 5000);
+            return;
+        }
+
+        // Show processing notification
+        showTemporaryNotification(`🚀 Processing ${selectedIds.length} selected projects...`, 3000);
+
+        console.log('📤 Making direct API call to backend...');
+        
+        // DIRECT API CALL to backend
+        const response = await fetch(`${EXTENSION_CONFIG.API_BASE_URL}/scrapper/scrape-project`, {
+            method: 'POST',
+            headers: {
+                ...EXTENSION_CONFIG.getRequestHeaders(),
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                project_ids: selectedIds,
+                url: "https://app.estimateone.com/tenders"
+            })
+        });
+
+        const data = await response.json();
+        console.log('📥 Backend response:', data);
+
+        if (response.ok) {
+            const processed = data.data?.processed || 0;
+            const failed = data.data?.failed || 0;
+            const total = selectedIds.length;
+
+            if (data.status === 'success' && processed === total) {
+                showTemporaryNotification(`🎉 Successfully processed all ${processed} projects!`, 5000);
+            } else if (data.status === 'partial_success' || (processed > 0 && failed > 0)) {
+                showTemporaryNotification(`✅ Processed ${processed}/${total} projects. ${failed} failed.`, 5000);
+            } else {
+                showTemporaryNotification(`❌ Failed to process projects: ${data.message || 'Unknown error'}`, 5000);
+            }
+        } else {
+            const errorMsg = data.detail || data.message || 'Server error';
+            showTemporaryNotification(`❌ Failed to process projects: ${errorMsg}`, 5000);
+        }
+
+        // Clear stored IDs after processing attempt
+        await clearStoredSelection();
+        
+        // Hide overlay after processing
+        setTimeout(() => {
+            hideProjectSelectionOverlay();
+        }, 2000);
+        
+    } catch (error) {
+        console.error('❌ Error processing projects:', error);
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            showTemporaryNotification('❌ Cannot connect to server. Please check your connection.', 5000);
+        } else {
+            showTemporaryNotification('❌ Network error. Please try again.', 5000);
+        }
+    } finally {
+        // Reset button state
+        if (confirmButton) {
+            confirmButton.disabled = false;
+            confirmButton.classList.remove('processing');
+            confirmButton.innerHTML = '🚀 Confirm & Process';
+        }
+        
+        if (statusElement) {
+            updateOverlayStatus();
+        }
+    }
+}
+
+// Show temporary notification to user
+function showTemporaryNotification(message, duration = 3000) {
+    // Remove existing notification
+    const existingNotification = document.getElementById('temp-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+
+    // Create notification
+    const notification = document.createElement('div');
+    notification.id = 'temp-notification';
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: #333;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10002;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 14px;
+        max-width: 350px;
+        word-wrap: break-word;
+        animation: slideIn 0.3s ease-out;
+    `;
+    
+    // Add animation styles
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    // Auto-remove after duration
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideIn 0.3s ease-out reverse';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+        }
+        if (style.parentNode) {
+            style.remove();
+        }
+    }, duration);
 }
 
 // Handle clear selection
@@ -520,6 +698,7 @@ async function handleClearSelection() {
     });
     
     updateOverlayStatus();
+    showTemporaryNotification('🧹 All selections cleared', 2000);
     console.log('🧹 All selections cleared');
 }
 
@@ -570,12 +749,14 @@ async function handleProjectRowClick(projectId, rowElement) {
         rowElement.classList.remove('project-row-selected');
         await removeIdFromStorage(projectId);
         console.log(`➖ Deselected project: ${projectId}`);
+        showTemporaryNotification(`➖ Deselected project ${projectId}`, 1500);
     } else {
         // Select
         selectedProjectIds.add(projectId);
         rowElement.classList.add('project-row-selected');
         await addIdToStorage(projectId);
         console.log(`➕ Selected project: ${projectId}`);
+        showTemporaryNotification(`➕ Selected project ${projectId}`, 1500);
     }
     
     updateOverlayStatus();
