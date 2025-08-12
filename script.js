@@ -290,7 +290,7 @@ async function handleViewDashboard() {
     }
 }
 
-// NEW: Handle Scrape Selected Projects
+// FIXED: Handle Scrape Selected Projects WITH POPUP DETECTION
 async function handleScrapeSelectedProjects() {
     console.log('🎯 Scrape Selected Projects button clicked');
     disableAllButtons();
@@ -310,7 +310,7 @@ async function handleScrapeSelectedProjects() {
             return;
         }
 
-        // Try to inject content script first, then send message
+        // Try to inject content script first
         try {
             await chrome.scripting.executeScript({
                 target: { tabId: tab.id },
@@ -320,31 +320,59 @@ async function handleScrapeSelectedProjects() {
             // Small delay to ensure script is loaded
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            showSuccess('scrape-success-message', '🔍 Detecting projects on page...');
-            
-            const detectResponse = await chrome.tabs.sendMessage(tab.id, {
-                action: 'detectAllProjects'
+            // STEP 1: Check if popup is open (THIS WAS MISSING)
+            console.log('🔍 Checking if popup is open...');
+            const popupCheckResponse = await chrome.tabs.sendMessage(tab.id, {
+                action: 'checkPopupStatus'
             });
+            
+            if (popupCheckResponse && popupCheckResponse.popupStatus && popupCheckResponse.popupStatus.isOpen) {
+                // SCENARIO 1: Popup is open - get single project ID from popup
+                console.log('✅ Popup is open - getting project ID from popup');
+                
+                const popupProjectResponse = await chrome.tabs.sendMessage(tab.id, {
+                    action: 'getPopupProjectId'
+                });
+                
+                if (popupProjectResponse && popupProjectResponse.projectId) {
+                    const singleProjectId = popupProjectResponse.projectId;
+                    console.log(`🎯 Found single project ID from popup: ${singleProjectId}`);
+                    
+                    // Send single project ID to backend
+                    await processSingleProject(singleProjectId, token);
+                } else {
+                    showError('scrape-error-message', 'Could not detect project ID from open popup');
+                }
+                
+            } else {
+                // SCENARIO 2: No popup is open - use multi-selection flow
+                console.log('❌ No popup is open - using multi-selection flow');
+                
+                showSuccess('scrape-success-message', '🔍 Detecting projects on page...');
+                
+                const detectResponse = await chrome.tabs.sendMessage(tab.id, {
+                    action: 'detectAllProjects'
+                });
 
-            if (!detectResponse || !detectResponse.success || detectResponse.projects.length === 0) {
-                showError('scrape-error-message', 'No projects found on this page');
-                return;
+                if (!detectResponse || !detectResponse.success || detectResponse.projects.length === 0) {
+                    showError('scrape-error-message', 'No projects found on this page');
+                    return;
+                }
+
+                showSuccess('scrape-success-message',
+                    `✅ Found ${detectResponse.projects.length} projects. Click on projects to select them.`);
+                
+                // Show selection overlay
+                await chrome.tabs.sendMessage(tab.id, {
+                    action: 'showSelectionOverlay'
+                });
+
+                // Listen for user selection
+                chrome.runtime.onMessage.addListener(handleProjectSelection);
+                showSuccess('scrape-success-message',
+                    '👆 Select projects on the page, then click "Confirm" in the overlay');
             }
-
-            showSuccess('scrape-success-message', 
-                `✅ Found ${detectResponse.projects.length} projects. Click on projects to select them.`);
-
-            // Show selection overlay
-            await chrome.tabs.sendMessage(tab.id, {
-                action: 'showSelectionOverlay'
-            });
-
-            // Listen for user selection
-            chrome.runtime.onMessage.addListener(handleProjectSelection);
             
-            showSuccess('scrape-success-message', 
-                '👆 Select projects on the page, then click "Confirm" in the overlay');
-
         } catch (contentScriptError) {
             console.error('Content script error:', contentScriptError);
             showError('scrape-error-message', 'Failed to load project selection interface. Please refresh the page and try again.');
@@ -357,6 +385,43 @@ async function handleScrapeSelectedProjects() {
         enableAllButtons();
     }
 }
+
+// Add this function to process single project from popup
+async function processSingleProject(projectId, token) {
+    try {
+        console.log(`🚀 Processing single project from popup: ${projectId}`);
+        console.log(`📤 FRONTEND SENDING SINGLE PROJECT: [${projectId}]`);
+        showSuccess('scrape-success-message', `🚀 Processing project ${projectId} from popup...`);
+
+        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/scrapper/scrape-project`, {
+            method: 'POST',
+            headers: {
+                ...window.ExtensionConfig.getRequestHeaders(),
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                project_ids: [projectId], // Send as array for consistency
+                url: "https://app.estimateone.com/tenders"
+            })
+        });
+
+        const data = await response.json();
+        console.log(`📥 BACKEND RESPONSE:`, data);
+
+        if (response.ok && data.status === 'success') {
+            showSuccess('scrape-success-message', 
+                `🎉 Successfully processed project ${projectId} from popup!`);
+        } else {
+            showError('scrape-error-message', 
+                `❌ Failed to process project ${projectId}: ${data.detail || 'Unknown error'}`);
+        }
+
+    } catch (error) {
+        console.error(`❌ Error processing single project ${projectId}:`, error);
+        showError('scrape-error-message', `❌ Failed to process project ${projectId}`);
+    }
+}
+
 
 // NEW: Handle project selection from content script
 async function handleProjectSelection(request, sender, sendResponse) {
