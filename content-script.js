@@ -25,15 +25,109 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'getSelectedProjects') {
         const selected = Array.from(selectedProjectIds);
         sendResponse({ success: true, selectedIds: selected });
+    } 
+    // NEW: Only these 2 new message handlers for popup detection
+    else if (request.action === 'checkPopupStatus') {
+        const popupStatus = checkIfPopupIsOpen();
+        sendResponse({ success: true, popupStatus });
+    } else if (request.action === 'getPopupProjectId') {
+        const projectId = getProjectIdFromPopup();
+        sendResponse({ success: true, projectId });
     }
 });
+
+// NEW: Check if popup is currently open (ONLY functionality addition)
+function checkIfPopupIsOpen() {
+    const popupSelectors = [
+        '.slide-pane__content',
+        '.ReactModal__Content',
+        '[role="dialog"]',
+        '.styles__slider__a65e8ea3f368640c502d',
+        '.ReactModal__Overlay--after-open'
+    ];
+
+    for (const selector of popupSelectors) {
+        try {
+            const element = document.querySelector(selector);
+            if (element) {
+                const computedStyle = window.getComputedStyle(element);
+                const isVisible = computedStyle.display !== 'none' &&
+                                computedStyle.visibility !== 'hidden' &&
+                                computedStyle.opacity !== '0';
+                
+                if (isVisible) {
+                    console.log(`✅ Popup is open with selector: ${selector}`);
+                    return { isOpen: true, selector: selector, element: element };
+                }
+            }
+        } catch (error) {
+            console.warn(`⚠️ Popup check failed for selector: ${selector}`, error);
+            continue;
+        }
+    }
+    
+    console.log('❌ No popup is currently open');
+    return { isOpen: false };
+}
+
+// NEW: Get project ID from open popup (ONLY functionality addition)
+function getProjectIdFromPopup() {
+    const popupStatus = checkIfPopupIsOpen();
+    
+    if (!popupStatus.isOpen) {
+        console.log('❌ No popup is open');
+        return null;
+    }
+
+    const popupContainer = popupStatus.element;
+    
+    const popupProjectIdSelectors = [
+        'span.styles__projectId__f47058b1431204abe7ec',
+        'span.styles__projectId__a99146050623e131a1bf',
+        '[class*="projectId"]',
+        'span[title*="ID"]'
+    ];
+
+    for (const selector of popupProjectIdSelectors) {
+        try {
+            const element = popupContainer.querySelector(selector);
+            if (element && element.textContent) {
+                const text = element.textContent.trim();
+                console.log(`✅ Found element within popup: ${selector}, text: ${text}`);
+                
+                const idMatch = text.match(/(?:ID\s*#?\s*)?(\d+)/i);
+                if (idMatch) {
+                    const projectId = idMatch[1];
+                    console.log(`🎯 Extracted project ID from popup: ${projectId}`);
+                    return projectId;
+                }
+            }
+        } catch (error) {
+            console.warn(`⚠️ Selector failed within popup: ${selector}`, error);
+            continue;
+        }
+    }
+
+    try {
+        const fullText = popupContainer.textContent || popupContainer.innerText;
+        const idMatch = fullText.match(/ID\s*#?\s*(\d+)/i);
+        if (idMatch) {
+            const projectId = idMatch[1];
+            console.log(`🎯 Found project ID via text search within popup: ${projectId}`);
+            return projectId;
+        }
+    } catch (error) {
+        console.warn('⚠️ Text-based fallback failed within popup:', error);
+    }
+
+    console.log('❌ No project ID found within the open popup');
+    return null;
+}
 
 // Initialize or restore selection session
 async function initializeSelectionSession() {
     try {
-        // Generate unique session ID if not exists
         const sessionData = await getStorageData('projectSelectionSession');
-        
         if (sessionData && sessionData.sessionId) {
             selectionSessionId = sessionData.sessionId;
             selectedProjectIds = new Set(sessionData.selectedIds || []);
@@ -65,7 +159,6 @@ async function saveSelectionSession() {
             lastUpdated: Date.now(),
             currentUrl: window.location.href
         };
-        
         await setStorageData('projectSelectionSession', sessionData);
         console.log(`💾 Saved session with ${selectedProjectIds.size} projects`);
     } catch (error) {
@@ -118,11 +211,7 @@ function detectAllProjectsOnPage() {
         elements.forEach((element, index) => {
             const projectId = element.textContent?.trim().match(/(\d+)/)?.[1];
             if (projectId) {
-                // Find the parent project container
-                const projectContainer = element.closest('[class*="project"], .card, [class*="item"]') || 
-                                       element.parentElement.parentElement;
-                
-                // Extract additional project info
+                const projectContainer = element.closest('[class*="project"], .card, [class*="item"]') || element.parentElement.parentElement;
                 const projectInfo = extractProjectInfo(projectContainer);
                 
                 projects.push({
@@ -167,7 +256,6 @@ function extractProjectInfo(container) {
     };
     
     try {
-        // Try to find project title
         const titleSelectors = [
             'h3', 'h4', 'h5', 
             '[class*="title"]', 
@@ -183,24 +271,19 @@ function extractProjectInfo(container) {
             }
         }
         
-        // Try to find deadline
         const text = container.textContent || '';
-        const deadlineMatch = text.match(/closes?\s+in\s+(\d+)\s+days?/i) || 
-                             text.match(/deadline[:\s]*([^,\n]+)/i);
+        const deadlineMatch = text.match(/closes?\s+in\s+(\d+)\s+days?/i) || text.match(/deadline[:\s]*([^,\n]+)/i);
         if (deadlineMatch) {
             info.deadline = deadlineMatch[1];
         }
         
-        // Try to find value
         const valueMatch = text.match(/\$[\d,.]+(M|K|k|m)?/i);
         if (valueMatch) {
             info.value = valueMatch[0];
         }
         
-        // Count trades
         const tradeElements = container.querySelectorAll('[class*="trade"], [class*="category"]');
         info.trades = tradeElements.length;
-        
     } catch (error) {
         console.warn('⚠️ Error extracting project info:', error);
     }
@@ -211,18 +294,109 @@ function extractProjectInfo(container) {
 // Show enhanced visual selection overlay with persistence
 function showProjectSelectionOverlay() {
     if (overlayActive) return;
-    
     console.log('👁️ Showing enhanced selection overlay...');
+    
     overlayActive = true;
     
-    // Create overlay container
+    // Create overlay container with proper CSS
     const overlay = document.createElement('div');
     overlay.id = 'project-selection-overlay';
     overlay.innerHTML = `
+        <style>
+            #project-selection-overlay {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 999999 !important;
+                background: rgba(0, 0, 0, 0.85) !important;
+                backdrop-filter: blur(8px) !important;
+                padding: 20px !important;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+            }
+            .selection-header {
+                background: white !important;
+                padding: 20px !important;
+                border-radius: 15px !important;
+                box-shadow: 0 15px 35px rgba(0,0,0,0.3) !important;
+                text-align: center !important;
+            }
+            .selection-status {
+                margin: 15px 0 !important;
+                font-size: 14px !important;
+                color: #666 !important;
+            }
+            .selection-controls {
+                display: flex !important;
+                gap: 10px !important;
+                justify-content: center !important;
+                flex-wrap: wrap !important;
+                margin-top: 20px !important;
+            }
+            .selection-controls button {
+                padding: 10px 15px !important;
+                border: none !important;
+                border-radius: 8px !important;
+                cursor: pointer !important;
+                font-weight: bold !important;
+                font-size: 14px !important;
+                transition: all 0.3s !important;
+            }
+            .refresh-btn { background: #17a2b8 !important; color: white !important; }
+            #select-all-btn { background: #28a745 !important; color: white !important; }
+            #clear-all-btn { background: #dc3545 !important; color: white !important; }
+            #view-selected-btn { background: #6f42c1 !important; color: white !important; }
+            #confirm-selection-btn { background: #007bff !important; color: white !important; }
+            #confirm-selection-btn:disabled { background: #ccc !important; cursor: not-allowed !important; }
+            #cancel-selection-btn { background: #6c757d !important; color: white !important; }
+            .project-selection-indicator {
+                position: absolute !important;
+                background: white !important;
+                border: 2px solid #007bff !important;
+                border-radius: 15px !important;
+                padding: 20px !important;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+                z-index: 1001 !important;
+                min-width: 350px !important;
+                max-width: 400px !important;
+                font-size: 14px !important;
+                cursor: pointer !important;
+                line-height: 1.4 !important;
+            }
+            .project-selection-indicator.selected {
+                background: #e8f5e8 !important;
+                border: 3px solid #28a745 !important;
+            }
+            .selection-checkbox input[type="checkbox"] {
+                display: inline-block !important;
+                width: 20px !important;
+                height: 20px !important;
+                margin-right: 10px !important;
+                cursor: pointer !important;
+                transform: scale(1.5) !important;
+            }
+            .project-id-display {
+                font-size: 18px !important;
+                font-weight: bold !important;
+                color: #000 !important;
+                margin-bottom: 8px !important;
+                width: 100% !important;
+            }
+            .selected-status {
+                color: #28a745 !important;
+                font-weight: bold !important;
+                font-size: 14px !important;
+                margin-top: 8px !important;
+                text-align: center !important;
+                background: #e8f5e8 !important;
+                padding: 6px !important;
+                border-radius: 4px !important;
+            }
+        </style>
         <div class="selection-header">
             <h3>🎯 Multi-Page Project Selection</h3>
             <div class="selection-status">
-                <span id="selection-count">${selectedProjectIds.size} projects selected across all pages</span>
+                <span id="selection-count">${selectedProjectIds.size} projects selected across all pages</span><br>
                 <span id="current-page-count">0 projects on current page</span>
             </div>
             <div class="selection-controls">
@@ -238,41 +412,48 @@ function showProjectSelectionOverlay() {
         </div>
     `;
     
-    // Apply enhanced styles
-    Object.assign(overlay.style, {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        right: '0',
-        zIndex: '999999',
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        padding: '20px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-    });
-    
     document.body.appendChild(overlay);
     
-    // Add event listeners for enhanced controls
-    attachEnhancedOverlayEventListeners();
+    // FIXED: Attach event handlers
+    attachOverlayEventHandlers();
     
     // Detect and mark projects on current page
     refreshCurrentPageProjects();
 }
 
-// Attach event listeners for enhanced overlay controls
-function attachEnhancedOverlayEventListeners() {
-    // Refresh button - NEW FEATURE
+// FIXED: Attach overlay event handlers
+function attachOverlayEventHandlers() {
+    // Refresh button
     document.getElementById('refresh-projects-btn')?.addEventListener('click', () => {
         console.log('🔄 Refresh button clicked');
         refreshCurrentPageProjects();
         showNotification('🔄 Page refreshed! Projects re-detected while preserving selections.', 'success');
     });
     
+    // Select all button
     document.getElementById('select-all-btn')?.addEventListener('click', selectAllProjectsOnPage);
+    
+    // Clear all button
     document.getElementById('clear-all-btn')?.addEventListener('click', clearAllSelections);
+    
+    // View selected button
     document.getElementById('view-selected-btn')?.addEventListener('click', showSelectedProjectsList);
-    document.getElementById('confirm-selection-btn')?.addEventListener('click', confirmSelection);
+    
+    // FIXED: Confirm button - send only selected IDs
+    document.getElementById('confirm-selection-btn')?.addEventListener('click', () => {
+        const selectedIds = Array.from(selectedProjectIds);
+        console.log(`📤 SENDING ONLY SELECTED: ${selectedIds.length} projects:`, selectedIds);
+        
+        // Send ONLY selected project IDs to popup/script.js
+        chrome.runtime.sendMessage({
+            action: 'projectsSelected',
+            selectedIds: selectedIds // This contains only user-selected IDs
+        });
+        
+        hideProjectSelectionOverlay();
+    });
+    
+    // Cancel button
     document.getElementById('cancel-selection-btn')?.addEventListener('click', hideProjectSelectionOverlay);
 }
 
@@ -321,7 +502,7 @@ function updateSelectionCounters(currentPageCount) {
     }
 }
 
-// Add selection indicator to project - COMPLETE FIXED VERSION
+// FIXED: Add selection indicator to project
 function addProjectSelectionIndicator(project, index) {
     if (!project.container) return;
     
@@ -329,14 +510,13 @@ function addProjectSelectionIndicator(project, index) {
     
     // Create selection indicator
     const indicator = document.createElement('div');
-    indicator.className = 'project-selection-indicator';
+    indicator.className = 'project-selection-indicator' + (isSelected ? ' selected' : '');
     indicator.innerHTML = `
         <div class="selection-controls-wrapper">
             <div class="selection-checkbox">
-                <input type="checkbox" id="project-${project.id}" ${isSelected ? 'checked' : ''} 
-                       style="display: inline-block !important; width: 20px; height: 20px; margin-right: 10px; cursor: pointer; transform: scale(1.5);">
+                <input type="checkbox" id="project-${project.id}" ${isSelected ? 'checked' : ''}>
                 <label for="project-${project.id}" style="display: flex; align-items: center; cursor: pointer; width: 100%;">
-                    <div class="project-id-display" style="font-size: 18px; font-weight: bold; color: #000; margin-bottom: 8px; width: 100%;">
+                    <div class="project-id-display">
                         🆔 PROJECT ID: <span style="color: #007bff; font-size: 20px;">${project.id}</span>
                     </div>
                 </label>
@@ -347,40 +527,38 @@ function addProjectSelectionIndicator(project, index) {
                     ⏰ <strong>Deadline:</strong> ${project.deadline}<br>
                     💰 <strong>Value:</strong> ${project.value}
                 </div>
-                ${isSelected ? '<div class="selected-status" style="color: #28a745; font-weight: bold; font-size: 14px; margin-top: 8px; text-align: center; background: #e8f5e8; padding: 6px; border-radius: 4px;">✅ SELECTED</div>' : ''}
+                ${isSelected ? '<div class="selected-status">✅ SELECTED</div>' : ''}
             </div>
         </div>
     `;
-
-    // Style the indicator with better dimensions
-    Object.assign(indicator.style, {
-        position: 'absolute',
-        top: '-25px',
-        right: '-25px',
-        background: isSelected ? '#e8f5e8' : 'white',
-        border: isSelected ? '3px solid #28a745' : '2px solid #007bff',
-        borderRadius: '15px',
-        padding: '20px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-        zIndex: '1001',
-        minWidth: '350px',
-        maxWidth: '400px',
-        fontSize: '14px',
-        cursor: 'pointer',
-        lineHeight: '1.4'
-    });
-
-    // Add click handler for selection toggle - THIS WAS MISSING!
+    
+    // Position indicator relative to project container
+    const rect = project.container.getBoundingClientRect();
+    indicator.style.position = 'absolute';
+    indicator.style.top = (window.scrollY + rect.top - 10) + 'px';
+    indicator.style.left = (window.scrollX + rect.right + 10) + 'px';
+    indicator.style.zIndex = '999999';
+    
+    // FIXED: Add click handler for checkbox
     const checkbox = indicator.querySelector('input[type="checkbox"]');
     checkbox.addEventListener('change', (e) => {
+        e.stopPropagation();
         toggleProjectSelection(project.id, e.target.checked);
     });
     
-    // Position indicator relative to project container - THIS WAS MISSING!
-    project.container.style.position = 'relative';
-    project.container.appendChild(indicator);
+    // Add click handler for the whole indicator
+    indicator.addEventListener('click', (e) => {
+        if (e.target !== checkbox) {
+            checkbox.checked = !checkbox.checked;
+            toggleProjectSelection(project.id, checkbox.checked);
+        }
+    });
     
-    // Add data attribute for easier identification - THIS WAS MISSING!
+    // Add to page
+    document.body.appendChild(indicator);
+    
+    // Store reference
+    indicator.setAttribute('data-project-id', project.id);
     project.container.setAttribute('data-project-id', project.id);
 }
 
@@ -402,29 +580,34 @@ async function toggleProjectSelection(projectId, isSelected) {
     updateSelectionCounters(allDetectedProjects.length);
 }
 
-// Update individual project indicator - FIXED VERSION
+// Update individual project indicator
 function updateProjectIndicator(projectId, isSelected) {
-    const container = document.querySelector(`[data-project-id="${projectId}"]`);
-    if (!container) return;
+    const indicator = document.querySelector(`[data-project-id="${projectId}"].project-selection-indicator`);
+    if (!indicator) return;
     
-    const indicator = container.querySelector('.project-selection-indicator');
-    const checkbox = indicator?.querySelector('input[type="checkbox"]');
-    const selectedStatus = indicator?.querySelector('.selected-status');
+    const checkbox = indicator.querySelector('input[type="checkbox"]');
+    const selectedStatus = indicator.querySelector('.selected-status');
     
-    if (indicator && checkbox) {
+    if (checkbox) {
         checkbox.checked = isSelected;
+    }
+    
+    // Update styling
+    if (isSelected) {
+        indicator.classList.add('selected');
         
-        // Update styling
-        indicator.style.background = isSelected ? '#e8f5e8' : 'white';
-        indicator.style.border = isSelected ? '3px solid #28a745' : '2px solid #007bff';
-        
-        // Update selected status text
-        if (isSelected && !selectedStatus) {
+        // Add selected status if not exists
+        if (!selectedStatus) {
             const detailsSection = indicator.querySelector('.project-details-section');
             if (detailsSection) {
-                detailsSection.innerHTML += '<div class="selected-status" style="color: #28a745; font-weight: bold; font-size: 14px; margin-top: 8px; text-align: center; background: #e8f5e8; padding: 6px; border-radius: 4px;">✅ SELECTED</div>';
+                detailsSection.innerHTML += '<div class="selected-status">✅ SELECTED</div>';
             }
-        } else if (!isSelected && selectedStatus) {
+        }
+    } else {
+        indicator.classList.remove('selected');
+        
+        // Remove selected status
+        if (selectedStatus) {
             selectedStatus.remove();
         }
     }
@@ -460,7 +643,7 @@ async function clearAllSelections() {
     showNotification('🗑️ All selections cleared across all pages!', 'info');
 }
 
-// Show list of selected project IDs with working close button - FIXED VERSION
+// Show list of selected project IDs
 function showSelectedProjectsList() {
     const selectedIds = Array.from(selectedProjectIds);
     
@@ -471,7 +654,7 @@ function showSelectedProjectsList() {
     
     const idsList = selectedIds.sort((a, b) => parseInt(a) - parseInt(b)).join(', ');
     
-    // Create modal with proper event handling
+    // Create modal
     const modal = document.createElement('div');
     modal.id = 'selected-projects-modal';
     modal.style.cssText = `
@@ -524,7 +707,6 @@ function showSelectedProjectsList() {
         }
     };
     
-    // Multiple ways to close the modal
     modal.querySelector('#close-modal-btn').addEventListener('click', closeModal);
     modal.querySelector('#close-modal-btn-2').addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
@@ -539,41 +721,6 @@ function showSelectedProjectsList() {
             showNotification('Failed to copy IDs', 'error');
         });
     });
-    
-    // ESC key to close
-    const handleEscape = (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', handleEscape);
-        }
-    };
-    document.addEventListener('keydown', handleEscape);
-}
-
-// Confirm selection and send to popup
-async function confirmSelection() {
-    const selectedIds = Array.from(selectedProjectIds);
-    console.log(`✔️ Confirming selection of ${selectedIds.length} projects:`, selectedIds);
-    
-    if (selectedIds.length === 0) {
-        showNotification('No projects selected!', 'error');
-        return;
-    }
-    
-    // Send message to popup/background script
-    chrome.runtime.sendMessage({
-        action: 'projectsSelected',
-        selectedIds: selectedIds,
-        sessionId: selectionSessionId
-    });
-    
-    // Clear session after confirmation
-    await clearSelectionSession();
-    
-    // Hide overlay
-    hideProjectSelectionOverlay();
-    
-    showNotification(`🎉 Successfully confirmed ${selectedIds.length} projects for processing!`, 'success');
 }
 
 // Hide selection overlay
@@ -591,7 +738,6 @@ function hideProjectSelectionOverlay() {
     // Reset project containers
     document.querySelectorAll('[data-project-id]').forEach(container => {
         container.removeAttribute('data-project-id');
-        container.style.position = '';
     });
     
     overlayActive = false;
@@ -635,22 +781,5 @@ function showNotification(message, type = 'info') {
         }
     }, 4000);
 }
-
-// Listen for page navigation to restore selections
-window.addEventListener('beforeunload', async () => {
-    if (selectedProjectIds.size > 0) {
-        await saveSelectionSession();
-        console.log('💾 Saved selections before page unload');
-    }
-});
-
-// Auto-restore selections when returning to a page
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(async () => {
-        if (selectedProjectIds.size > 0) {
-            console.log(`🔄 Page loaded with ${selectedProjectIds.size} existing selections`);
-        }
-    }, 1000);
-});
 
 console.log('✅ Enhanced multi-page project selection script loaded successfully');
