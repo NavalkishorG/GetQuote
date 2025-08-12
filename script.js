@@ -215,7 +215,7 @@ function attachAuthenticatedEventListeners() {
         document.getElementById('scrape-tenders-btn').addEventListener('click', handleScrapeTenders);
     }
     
-    // NEW: Scrape Selected Projects button
+    // Scrape Selected Projects button
     if (scrapeSelectedBtn) {
         scrapeSelectedBtn.replaceWith(scrapeSelectedBtn.cloneNode(true));
         document.getElementById('scrape-selected-btn').addEventListener('click', handleScrapeSelectedProjects);
@@ -228,7 +228,7 @@ function attachAuthenticatedEventListeners() {
     }
 }
 
-// Storage Management Functions - NEW
+// Storage Management Functions for Selected IDs
 async function storeSelectedIds(selectedIds) {
     return new Promise((resolve) => {
         chrome.storage.local.set({selected_project_ids: selectedIds}, () => {
@@ -263,8 +263,96 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'projectsSelected') {
         handleProjectSelection(request, sender, sendResponse);
         sendResponse({success: true});
+    } 
+    // NEW: Handle immediate processing from confirm button
+    else if (request.action === 'processSelectedProjectsNow') {
+        handleImmediateProcessing(request.selectedIds);
+        sendResponse({success: true});
     }
 });
+
+// NEW: Handle immediate processing when confirm button is clicked
+async function handleImmediateProcessing(selectedIds) {
+    console.log('🚀 IMMEDIATE PROCESSING triggered by confirm button:', selectedIds);
+    
+    try {
+        const token = await getStoredToken();
+        if (!token) {
+            showError('scrape-error-message', 'Session expired. Please login again.');
+            showLoginForm();
+            return;
+        }
+
+        if (selectedIds.length === 0) {
+            showError('scrape-error-message', 'No projects selected');
+            return;
+        }
+
+        // Show progress in popup
+        showSuccess('scrape-success-message',
+            `🚀 Processing ${selectedIds.length} selected projects from confirm button...`);
+        
+        // Process the selected projects immediately
+        await processSelectedProjectsImmediate(selectedIds, token);
+        
+        // Clear stored IDs after successful processing
+        await clearStoredSelectedIds();
+        
+    } catch (error) {
+        console.error('❌ Error in immediate processing:', error);
+        showError('scrape-error-message', 'Failed to process selected projects');
+    }
+}
+
+// NEW: Immediate processing function
+async function processSelectedProjectsImmediate(selectedIds, token) {
+    console.log('🔥 IMMEDIATE FRONTEND PROCESSING SELECTED PROJECTS');
+    console.log('📤 Sending project IDs:', selectedIds);
+    
+    try {
+        showSuccess('scrape-success-message',
+            `🚀 Processing ${selectedIds.length} selected projects...`);
+
+        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/scrapper/scrape-project`, {
+            method: 'POST',
+            headers: {
+                ...window.ExtensionConfig.getRequestHeaders(),
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                project_ids: selectedIds,  // Send as array with stringify
+                url: "https://app.estimateone.com/tenders"
+            })
+        });
+
+        const data = await response.json();
+        console.log('📥 IMMEDIATE BACKEND RESPONSE:', data);
+
+        if (response.ok) {
+            const processed = data.data?.processed || 0;
+            const failed = data.data?.failed || 0;
+            const total = selectedIds.length;
+
+            if (data.status === 'success' && processed === total) {
+                showSuccess('scrape-success-message',
+                    `🎉 Successfully processed all ${processed} selected projects via confirm button!`);
+            } else if (data.status === 'partial_success' || (processed > 0 && failed > 0)) {
+                showSuccess('scrape-success-message',
+                    `✅ Processed ${processed}/${total} projects via confirm button. ${failed} failed.`);
+            } else {
+                showError('scrape-error-message',
+                    `❌ Failed to process projects: ${data.message || 'Unknown error'}`);
+            }
+        } else {
+            showError('scrape-error-message',
+                `❌ Failed to process projects: ${data.detail || data.message || 'Server error'}`);
+        }
+
+    } catch (error) {
+        console.error('❌ Network error processing projects:', error);
+        showError('scrape-error-message', '❌ Network error. Please try again.');
+    }
+}
 
 // Dashboard Functions
 let dashboardWindowId = null;
@@ -340,7 +428,7 @@ async function handleScrapeSelectedProjects() {
         const storedIds = await getStoredSelectedIds();
         if (storedIds && storedIds.length > 0) {
             console.log('✅ Found stored project IDs:', storedIds);
-            await processSelectedProjects(storedIds, token);
+            await processSelectedProjectsImmediate(storedIds, token);
             // Clear stored IDs after processing
             await clearStoredSelectedIds();
             return;
@@ -385,7 +473,7 @@ async function handleScrapeSelectedProjects() {
                 }
 
                 showSuccess('scrape-success-message',
-                    `✅ Found ${detectResponse.projects.length} projects. Click on projects to select them, then click "Confirm".`);
+                    `✅ Found ${detectResponse.projects.length} projects. Click on projects to select them, then click "Confirm & Process".`);
 
                 await sendMessageWithRetry(tab.id, {
                     action: 'showSelectionOverlay'
@@ -456,7 +544,7 @@ async function processSingleProject(projectId, token) {
     }
 }
 
-// Handle project selection from content script
+// Handle project selection from content script (fallback)
 async function handleProjectSelection(request, sender, sendResponse) {
     if (request.action === 'projectsSelected') {
         console.log('📋 Projects selected:', request.selectedIds);
@@ -480,7 +568,7 @@ async function handleProjectSelection(request, sender, sendResponse) {
                 `🚀 Processing ${request.selectedIds.length} selected projects...`);
             
             // Process selected projects
-            await processSelectedProjects(request.selectedIds, token);
+            await processSelectedProjectsImmediate(request.selectedIds, token);
             
             // Clear stored IDs after processing
             await clearStoredSelectedIds();
@@ -489,56 +577,6 @@ async function handleProjectSelection(request, sender, sendResponse) {
             console.error('❌ Error processing selected projects:', error);
             showError('scrape-error-message', 'Failed to process selected projects');
         }
-    }
-}
-
-// Process selected projects - UPDATED with proper stringify format
-async function processSelectedProjects(selectedIds, token) {
-    console.log('🔥 FRONTEND PROCESSING SELECTED PROJECTS');
-    console.log('📤 Sending project IDs:', selectedIds);
-    
-    try {
-        showSuccess('scrape-success-message',
-            `🚀 Processing ${selectedIds.length} selected projects...`);
-
-        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/scrapper/scrape-project`, {
-            method: 'POST',
-            headers: {
-                ...window.ExtensionConfig.getRequestHeaders(),
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                project_ids: selectedIds,  // Send as array with stringify
-                url: "https://app.estimateone.com/tenders"
-            })
-        });
-
-        const data = await response.json();
-        console.log('📥 BACKEND RESPONSE:', data);
-
-        if (response.ok) {
-            const processed = data.data?.processed || 0;
-            const failed = data.data?.failed || 0;
-            const total = selectedIds.length;
-
-            if (data.status === 'success' && processed === total) {
-                showSuccess('scrape-success-message',
-                    `🎉 Successfully processed all ${processed} selected projects!`);
-            } else if (data.status === 'partial_success' || (processed > 0 && failed > 0)) {
-                showSuccess('scrape-success-message',
-                    `✅ Processed ${processed}/${total} projects. ${failed} failed.`);
-            } else {
-                showError('scrape-error-message',
-                    `❌ Failed to process projects: ${data.message || 'Unknown error'}`);
-            }
-        } else {
-            showError('scrape-error-message',
-                `❌ Failed to process projects: ${data.detail || data.message || 'Server error'}`);
-        }
-
-    } catch (error) {
-        console.error('❌ Network error processing projects:', error);
-        showError('scrape-error-message', '❌ Network error. Please try again.');
     }
 }
 

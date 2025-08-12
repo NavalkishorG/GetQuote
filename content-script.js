@@ -346,7 +346,11 @@ function extractProjectInfo(container) {
 
 // FIXED: Show NON-BLOCKING overlay that allows page interaction
 function showProjectSelectionOverlay() {
-    if (overlayActive) return;
+    if (overlayActive) {
+        console.log('⚠️ Overlay already active, refreshing instead of recreating...');
+        refreshCurrentPageWithOverlay();
+        return;
+    }
     
     console.log('👁️ Showing non-blocking selection overlay...');
     overlayActive = true;
@@ -367,7 +371,7 @@ function showProjectSelectionOverlay() {
                 <button id="clear-all-btn">❌ Clear All</button>
                 <button id="view-selected-btn">👁️ View Selected</button>
                 <button id="confirm-selection-btn" ${selectedProjectIds.size === 0 ? 'disabled' : ''}>
-                    ✔️ Confirm ${selectedProjectIds.size} Selected
+                    ✔️ Confirm & Process ${selectedProjectIds.size} Selected
                 </button>
                 <button id="cancel-selection-btn">❌ Cancel</button>
             </div>
@@ -383,7 +387,6 @@ function showProjectSelectionOverlay() {
             left: 0 !important;
             right: 0 !important;
             z-index: 999999 !important;
-            /* REMOVED: background, backdrop-filter - these were blocking interaction */
             padding: 10px !important;
             pointer-events: none !important; /* KEY FIX: Overlay itself doesn't block clicks */
         }
@@ -442,8 +445,8 @@ function showProjectSelectionOverlay() {
         #view-selected-btn { background: #6f42c1 !important; color: white !important; }
         #view-selected-btn:hover { background: #5a32a3 !important; }
         
-        #confirm-selection-btn { background: #007bff !important; color: white !important; }
-        #confirm-selection-btn:hover:not(:disabled) { background: #0056b3 !important; }
+        #confirm-selection-btn { background: #28a745 !important; color: white !important; }
+        #confirm-selection-btn:hover:not(:disabled) { background: #218838 !important; }
         #confirm-selection-btn:disabled { background: #ccc !important; cursor: not-allowed !important; }
         
         #cancel-selection-btn { background: #6c757d !important; color: white !important; }
@@ -510,7 +513,7 @@ function showProjectSelectionOverlay() {
     // Update counter
     updateSelectionCounter();
     
-    // Set up page change detection
+    // Set up persistent page change detection
     setupPageChangeDetection();
 }
 
@@ -692,6 +695,22 @@ function refreshCurrentPage() {
     console.log(`✅ Refreshed page - found ${projects.length} projects`);
 }
 
+// NEW: Refresh current page while maintaining overlay
+function refreshCurrentPageWithOverlay() {
+    console.log('🔄 Refreshing current page while maintaining overlay...');
+    
+    // Don't recreate overlay, just refresh the projects
+    const projects = detectAllProjectsOnPage();
+    makeProjectRowsSelectable();
+    updateSelectionCounter();
+    updateCurrentPageCount();
+    
+    console.log(`✅ Page refreshed with overlay maintained - found ${projects.length} projects`);
+    
+    // Show notification to user
+    showNotification(`🔄 Page refreshed - found ${projects.length} projects. ${selectedProjectIds.size} total selected.`, 'info');
+}
+
 // Show list of selected projects
 function showSelectedProjectsList() {
     const selectedList = Array.from(selectedProjectIds);
@@ -733,7 +752,7 @@ function showSelectedProjectsList() {
     });
 }
 
-// Handle confirm button click
+// FIXED: Handle confirm button click - Now processes projects immediately
 function handleConfirmSelection() {
     const selectedIds = Array.from(selectedProjectIds);
     
@@ -742,20 +761,26 @@ function handleConfirmSelection() {
         return;
     }
     
-    console.log('📤 Sending selected project IDs:', selectedIds);
+    console.log('📤 Confirm button clicked - Processing selected project IDs:', selectedIds);
     
+    // Store selected IDs
     storeSelectedIdsViaBackground(selectedIds);
     
+    // NEW: Send message to popup to actually process the projects
     chrome.runtime.sendMessage({
-        action: 'projectsSelected',
+        action: 'processSelectedProjectsNow', // New action for immediate processing
         selectedIds: selectedIds
     }, (response) => {
         if (chrome.runtime.lastError) {
             console.error('Message send error:', chrome.runtime.lastError);
+            // Fallback: store in DOM
             window.selectedProjectIds = selectedIds;
+        } else {
+            console.log('✅ Projects sent for processing');
         }
     });
     
+    // Hide overlay after sending for processing
     hideProjectSelectionOverlay();
 }
 
@@ -772,7 +797,7 @@ function updateSelectionCounter() {
     
     if (confirmBtn) {
         confirmBtn.disabled = count === 0;
-        confirmBtn.innerHTML = `✔️ Confirm ${count} Selected`;
+        confirmBtn.innerHTML = `✔️ Confirm & Process ${count} Selected`;
     }
 }
 
@@ -825,7 +850,7 @@ function hideProjectSelectionOverlay() {
     }
 }
 
-// Set up page change detection
+// FIXED: Enhanced setup for page change detection with overlay persistence
 function setupPageChangeDetection() {
     if (window.pageChangeObserver) {
         window.pageChangeObserver.disconnect();
@@ -835,19 +860,28 @@ function setupPageChangeDetection() {
     
     const checkUrlChange = () => {
         if (window.location.href !== currentUrl) {
-            console.log('🔄 Page URL changed, refreshing project selection...');
+            console.log('🔄 Page URL changed, maintaining overlay...');
+            const previousUrl = currentUrl;
             currentUrl = window.location.href;
             
+            // Small delay to let new content load
             setTimeout(() => {
                 if (overlayActive) {
-                    refreshCurrentPage();
+                    console.log('✅ Overlay was active, maintaining it on new page...');
+                    
+                    // Re-detect projects on new page while keeping overlay
+                    refreshCurrentPageWithOverlay();
+                } else {
+                    console.log('❌ Overlay was not active, not showing on new page');
                 }
-            }, 1000);
+            }, 1500); // Increased delay for EstimateOne page loads
         }
     };
     
-    const urlCheckInterval = setInterval(checkUrlChange, 1000);
+    // Check URL changes every 500ms for faster detection
+    const urlCheckInterval = setInterval(checkUrlChange, 500);
     
+    // Enhanced DOM change detection
     window.pageChangeObserver = new MutationObserver((mutations) => {
         let shouldRefresh = false;
         
@@ -855,7 +889,13 @@ function setupPageChangeDetection() {
             if (mutation.type === 'childList') {
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) {
-                        if (node.querySelector && (node.querySelector('span.styles__projectId__a99146050623e131a1bf') || node.querySelector('[id*="projectId_"]'))) {
+                        // Check for project elements or page content changes
+                        if (node.querySelector && (
+                            node.querySelector('span.styles__projectId__a99146050623e131a1bf') || 
+                            node.querySelector('[id*="projectId_"]') ||
+                            node.querySelector('tbody') ||
+                            node.querySelector('.styles__tenderRow__b2e48989c7e9117bd552')
+                        )) {
                             shouldRefresh = true;
                         }
                     }
@@ -864,25 +904,67 @@ function setupPageChangeDetection() {
         });
         
         if (shouldRefresh && overlayActive) {
-            console.log('🔄 DOM changed, refreshing project selection...');
+            console.log('🔄 DOM changed, refreshing project selection while maintaining overlay...');
             clearTimeout(window.refreshTimeout);
             window.refreshTimeout = setTimeout(() => {
-                refreshCurrentPage();
-            }, 500);
+                refreshCurrentPageWithOverlay();
+            }, 800); // Slightly longer delay for DOM stability
         }
     });
     
+    // Observe with more comprehensive settings
     window.pageChangeObserver.observe(document.body, {
         childList: true,
-        subtree: true
+        subtree: true,
+        attributes: false, // Don't watch attributes to reduce noise
+        characterData: false // Don't watch text changes
     });
     
+    // Enhanced cleanup
     window.addEventListener('beforeunload', () => {
         clearInterval(urlCheckInterval);
         if (window.pageChangeObserver) {
             window.pageChangeObserver.disconnect();
         }
     });
+}
+
+// NEW: Show notification to user
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    
+    const colors = {
+        success: '#4caf50',
+        error: '#f44336',
+        info: '#2196f3',
+        warning: '#ff9800'
+    };
+    
+    Object.assign(notification.style, {
+        position: 'fixed',
+        top: '80px', // Below the overlay header
+        right: '20px',
+        background: colors[type] || colors.info,
+        color: 'white',
+        padding: '12px 20px',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        zIndex: '1000001',
+        fontSize: '14px',
+        fontWeight: '600',
+        maxWidth: '300px',
+        wordWrap: 'break-word'
+    });
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 3000);
 }
 
 // Cleanup on page unload
