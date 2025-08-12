@@ -1,10 +1,10 @@
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('Extension popup loaded');
-    
+
     // Check if user is already authenticated
     const token = await getStoredToken();
     console.log('Stored token exists:', !!token);
-    
+
     if (token) {
         try {
             const user = await verifyToken(token);
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             await clearStoredToken();
         }
     }
-    
+
     // Show login form if no valid token
     showLoginForm();
 });
@@ -57,7 +57,7 @@ function updateCredentialStatus(user) {
     const statusElement = document.getElementById('credential-status');
     const statusText = document.getElementById('credential-status-text');
     console.log('Updating credential status:', user.credentials_stored);
-    
+
     if (user.credentials_stored) {
         statusElement.className = 'credential-status stored';
         statusText.textContent = '✓ EstimateOne credentials stored securely';
@@ -83,7 +83,7 @@ function hideAllForms() {
 function clearErrors() {
     const errorElements = [
         'error-message',
-        'signup-error-message', 
+        'signup-error-message',
         'scrape-error-message',
         'scrape-success-message'
     ];
@@ -139,29 +139,29 @@ function attachLoginEventListeners() {
     const loginEmail = document.getElementById('login-email');
     const loginPassword = document.getElementById('login-password');
     const forgotPassword = document.getElementById('forgot-password');
-    
+
     if (loginBtn) {
         loginBtn.replaceWith(loginBtn.cloneNode(true));
         document.getElementById('login-btn').addEventListener('click', handleLogin);
     }
-    
+
     if (showSignupBtn) {
         showSignupBtn.replaceWith(showSignupBtn.cloneNode(true));
         document.getElementById('show-signup-btn').addEventListener('click', showSignupForm);
     }
-    
+
     if (loginEmail) {
         loginEmail.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleLogin();
         });
     }
-    
+
     if (loginPassword) {
         loginPassword.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleLogin();
         });
     }
-    
+
     if (forgotPassword) {
         forgotPassword.addEventListener('click', () => {
             chrome.tabs.create({url: 'https://app.estimateone.com/auth/forgot-password'});
@@ -174,23 +174,23 @@ function attachSignupEventListeners() {
     const showLoginBtn = document.getElementById('show-login-btn');
     const signupEmail = document.getElementById('signup-email');
     const signupPassword = document.getElementById('signup-password');
-    
+
     if (signupBtn) {
         signupBtn.replaceWith(signupBtn.cloneNode(true));
         document.getElementById('signup-btn').addEventListener('click', handleSignup);
     }
-    
+
     if (showLoginBtn) {
         showLoginBtn.replaceWith(showLoginBtn.cloneNode(true));
         document.getElementById('show-login-btn').addEventListener('click', showLoginForm);
     }
-    
+
     if (signupEmail) {
         signupEmail.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleSignup();
         });
     }
-    
+
     if (signupPassword) {
         signupPassword.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleSignup();
@@ -200,27 +200,28 @@ function attachSignupEventListeners() {
 
 function attachAuthenticatedEventListeners() {
     console.log('Attaching authenticated event listeners...');
+    
     const logoutBtn = document.getElementById('logout-btn');
     const scrapeTendersBtn = document.getElementById('scrape-tenders-btn');
     const scrapeSelectedBtn = document.getElementById('scrape-selected-btn');
     const viewDashboardBtn = document.getElementById('view-dashboard-btn');
-    
+
     if (logoutBtn) {
         logoutBtn.replaceWith(logoutBtn.cloneNode(true));
         document.getElementById('logout-btn').addEventListener('click', handleLogout);
     }
-    
+
     if (scrapeTendersBtn) {
         scrapeTendersBtn.replaceWith(scrapeTendersBtn.cloneNode(true));
         document.getElementById('scrape-tenders-btn').addEventListener('click', handleScrapeTenders);
     }
-    
-    // Scrape Selected Projects button
+
+    // Updated: Scrape Selected Projects button for multi-selection and popup scenarios
     if (scrapeSelectedBtn) {
         scrapeSelectedBtn.replaceWith(scrapeSelectedBtn.cloneNode(true));
         document.getElementById('scrape-selected-btn').addEventListener('click', handleScrapeSelectedProjects);
     }
-    
+
     if (viewDashboardBtn) {
         viewDashboardBtn.replaceWith(viewDashboardBtn.cloneNode(true));
         document.getElementById('view-dashboard-btn').addEventListener('click', handleViewDashboard);
@@ -289,14 +290,20 @@ async function handleImmediateProcessing(selectedIds) {
         }
 
         // Show progress in popup
-        showSuccess('scrape-success-message',
+        showSuccess('scrape-success-message', 
             `🚀 Processing ${selectedIds.length} selected projects from confirm button...`);
-        
+
         // Process the selected projects immediately
         await processSelectedProjectsImmediate(selectedIds, token);
         
         // Clear stored IDs after successful processing
         await clearStoredSelectedIds();
+        
+        // Clear selection in content script
+        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+        if (tab) {
+            chrome.tabs.sendMessage(tab.id, { action: 'clearStoredSelection' });
+        }
         
     } catch (error) {
         console.error('❌ Error in immediate processing:', error);
@@ -308,9 +315,9 @@ async function handleImmediateProcessing(selectedIds) {
 async function processSelectedProjectsImmediate(selectedIds, token) {
     console.log('🔥 IMMEDIATE FRONTEND PROCESSING SELECTED PROJECTS');
     console.log('📤 Sending project IDs:', selectedIds);
-    
+
     try {
-        showSuccess('scrape-success-message',
+        showSuccess('scrape-success-message', 
             `🚀 Processing ${selectedIds.length} selected projects...`);
 
         const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/scrapper/scrape-project`, {
@@ -320,7 +327,7 @@ async function processSelectedProjectsImmediate(selectedIds, token) {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                project_ids: selectedIds,  // Send as array with stringify
+                project_ids: selectedIds, // Send as array with stringify
                 url: "https://app.estimateone.com/tenders"
             })
         });
@@ -334,20 +341,19 @@ async function processSelectedProjectsImmediate(selectedIds, token) {
             const total = selectedIds.length;
 
             if (data.status === 'success' && processed === total) {
-                showSuccess('scrape-success-message',
+                showSuccess('scrape-success-message', 
                     `🎉 Successfully processed all ${processed} selected projects via confirm button!`);
             } else if (data.status === 'partial_success' || (processed > 0 && failed > 0)) {
-                showSuccess('scrape-success-message',
+                showSuccess('scrape-success-message', 
                     `✅ Processed ${processed}/${total} projects via confirm button. ${failed} failed.`);
             } else {
-                showError('scrape-error-message',
+                showError('scrape-error-message', 
                     `❌ Failed to process projects: ${data.message || 'Unknown error'}`);
             }
         } else {
-            showError('scrape-error-message',
+            showError('scrape-error-message', 
                 `❌ Failed to process projects: ${data.detail || data.message || 'Server error'}`);
         }
-
     } catch (error) {
         console.error('❌ Network error processing projects:', error);
         showError('scrape-error-message', '❌ Network error. Please try again.');
@@ -362,23 +368,24 @@ async function handleViewDashboard() {
     try {
         chrome.windows.getCurrent(async (currentWindow) => {
             const targetURL = 'dashboard.html';
+            
             chrome.windows.getAll({populate: true, windowTypes: ['popup']}, (windowArray) => {
                 const queryURL = `chrome-extension://${chrome.runtime.id}/${targetURL}`;
                 const existingDashboard = windowArray.find(window => 
                     window.tabs && window.tabs[0] && window.tabs[0].url === queryURL
                 );
-                
+
                 if (existingDashboard) {
                     chrome.windows.update(existingDashboard.id, {focused: true});
                     console.log('Focused existing dashboard window');
                     return;
                 }
-                
+
                 const width = Math.round(currentWindow.width * 0.7);
                 const height = Math.round(currentWindow.height * 0.8);
                 const left = Math.round((currentWindow.width - width) * 0.5 + currentWindow.left);
                 const top = Math.round((currentWindow.height - height) * 0.5 + currentWindow.top);
-                
+
                 chrome.windows.create({
                     focused: true,
                     url: targetURL,
@@ -404,11 +411,11 @@ async function handleViewDashboard() {
     }
 }
 
-// UPDATED: Handle Scrape Selected Projects with storage and popup detection
+// UPDATED: Handle Scrape Selected Projects - only for popup detection, multi-selection moved to overlay
 async function handleScrapeSelectedProjects() {
     console.log('🎯 Scrape Selected Projects button clicked');
     disableAllButtons();
-    
+
     try {
         const token = await getStoredToken();
         if (!token) {
@@ -424,17 +431,15 @@ async function handleScrapeSelectedProjects() {
             return;
         }
 
-        // Check for stored IDs first
+        // Check for stored IDs first (fallback)
         const storedIds = await getStoredSelectedIds();
         if (storedIds && storedIds.length > 0) {
             console.log('✅ Found stored project IDs:', storedIds);
             await processSelectedProjectsImmediate(storedIds, token);
-            // Clear stored IDs after processing
             await clearStoredSelectedIds();
             return;
         }
 
-        // Rest of your existing logic for popup detection and selection
         try {
             await chrome.scripting.executeScript({
                 target: { tabId: tab.id },
@@ -442,8 +447,8 @@ async function handleScrapeSelectedProjects() {
             });
             
             await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Check if popup is open
+
+            // Check if popup is open (popup scenario)
             const popupCheckResponse = await sendMessageWithRetry(tab.id, {
                 action: 'checkPopupStatus'
             });
@@ -462,7 +467,7 @@ async function handleScrapeSelectedProjects() {
                     showError('scrape-error-message', 'Could not detect project ID from open popup');
                 }
             } else {
-                // Handle multi-selection scenario
+                // Handle multi-selection scenario - show overlay
                 const detectResponse = await sendMessageWithRetry(tab.id, {
                     action: 'detectAllProjects'
                 });
@@ -472,9 +477,9 @@ async function handleScrapeSelectedProjects() {
                     return;
                 }
 
-                showSuccess('scrape-success-message',
+                showSuccess('scrape-success-message', 
                     `✅ Found ${detectResponse.projects.length} projects. Click on projects to select them, then click "Confirm & Process".`);
-
+                
                 await sendMessageWithRetry(tab.id, {
                     action: 'showSelectionOverlay'
                 });
@@ -531,13 +536,12 @@ async function processSingleProject(projectId, token) {
         console.log(`📥 Backend response:`, data);
 
         if (response.ok && (data.status === 'success' || data.status === 'partial_success')) {
-            showSuccess('scrape-success-message',
+            showSuccess('scrape-success-message', 
                 `🎉 Successfully processed project ${projectId} from popup!`);
         } else {
-            showError('scrape-error-message',
+            showError('scrape-error-message', 
                 `❌ Failed to process project ${projectId}: ${data.detail || data.message || 'Unknown error'}`);
         }
-
     } catch (error) {
         console.error(`❌ Error processing single project ${projectId}:`, error);
         showError('scrape-error-message', `❌ Failed to process project ${projectId}`);
@@ -548,6 +552,7 @@ async function processSingleProject(projectId, token) {
 async function handleProjectSelection(request, sender, sendResponse) {
     if (request.action === 'projectsSelected') {
         console.log('📋 Projects selected:', request.selectedIds);
+        
         try {
             const token = await getStoredToken();
             if (!token) {
@@ -562,17 +567,16 @@ async function handleProjectSelection(request, sender, sendResponse) {
 
             // Store selected IDs
             await storeSelectedIds(request.selectedIds);
-
-            // Show progress
-            showSuccess('scrape-success-message',
-                `🚀 Processing ${request.selectedIds.length} selected projects...`);
             
+            // Show progress
+            showSuccess('scrape-success-message', 
+                `🚀 Processing ${request.selectedIds.length} selected projects...`);
+
             // Process selected projects
             await processSelectedProjectsImmediate(request.selectedIds, token);
             
             // Clear stored IDs after processing
             await clearStoredSelectedIds();
-            
         } catch (error) {
             console.error('❌ Error processing selected projects:', error);
             showError('scrape-error-message', 'Failed to process selected projects');
@@ -589,46 +593,46 @@ async function handleLogin() {
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-password').value.trim();
         console.log('Login attempt for email:', email);
-        
+
         if (!email || !password) {
             showError('error-message', 'Please enter both email and password');
             return;
         }
-        
+
         if (!isValidEmail(email)) {
             showError('error-message', 'Please enter a valid email address');
             return;
         }
-        
+
         showLoading();
         console.log('Sending login request...');
-        
+
         const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/login`, {
             method: 'POST',
             headers: window.ExtensionConfig.getRequestHeaders(),
             body: JSON.stringify({ email, password })
         });
-        
+
         const data = await response.json();
         console.log('Login response:', {
             status: response.status,
             authenticated: data.authenticated,
             credentials_stored: data.credentials_stored
         });
-        
+
         if (response.ok && data.authenticated) {
             console.log('Login successful, storing token...');
             await storeToken(data.access_token);
             
-            const credentialMessage = data.credentials_stored 
+            const credentialMessage = data.credentials_stored
                 ? "Login successful! EstimateOne credentials stored securely."
                 : "Login successful! Note: Credential storage failed - some features may be limited.";
-            
+
             showAuthenticatedUI({
                 ...data.user,
                 credentials_stored: data.credentials_stored
             });
-            
+
             if (data.credentials_stored) {
                 showSuccess('scrape-success-message', credentialMessage);
             } else {
@@ -639,7 +643,6 @@ async function handleLogin() {
             showLoginForm();
             showError('error-message', data.detail || 'Login failed');
         }
-        
     } catch (error) {
         console.error('Login network error:', error);
         showLoginForm();
@@ -657,34 +660,34 @@ async function handleSignup() {
         const email = document.getElementById('signup-email').value.trim();
         const password = document.getElementById('signup-password').value.trim();
         console.log('Signup attempt for email:', email);
-        
+
         if (!email || !password) {
             showError('signup-error-message', 'Please enter both email and password');
             return;
         }
-        
+
         if (!isValidEmail(email)) {
             showError('signup-error-message', 'Please enter a valid email address');
             return;
         }
-        
+
         if (password.length < 6) {
             showError('signup-error-message', 'Password must be at least 6 characters long');
             return;
         }
-        
+
         showLoading();
         console.log('Sending signup request...');
-        
+
         const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/signup`, {
             method: 'POST',
             headers: window.ExtensionConfig.getRequestHeaders(),
             body: JSON.stringify({ email, password })
         });
-        
+
         const data = await response.json();
         console.log('Signup response:', { status: response.status, success: data.success });
-        
+
         if (response.ok && data.success) {
             console.log('Signup successful');
             showLoginForm();
@@ -694,7 +697,6 @@ async function handleSignup() {
             showSignupForm();
             showError('signup-error-message', data.detail || 'Signup failed');
         }
-        
     } catch (error) {
         console.error('Signup network error:', error);
         showSignupForm();
@@ -714,9 +716,9 @@ async function handleLogout() {
             showLoginForm();
             return;
         }
-        
+
         showLoading();
-        
+
         try {
             await fetch(`${window.ExtensionConfig.API_BASE_URL}/supabase/logout`, {
                 method: 'POST',
@@ -729,11 +731,11 @@ async function handleLogout() {
         } catch (error) {
             console.log('Server logout failed, but continuing with client logout:', error);
         }
-        
+
         await clearStoredToken();
         await clearStoredSelectedIds(); // Also clear any stored project selections
-        console.log('Token cleared, showing login form');
         
+        console.log('Token cleared, showing login form');
         setTimeout(() => {
             showLoginForm();
         }, 100);
@@ -761,7 +763,7 @@ async function handleScrapeTenders() {
             showLoginForm();
             return;
         }
-        
+
         const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
         const url = tab.url;
         console.log('Current tab URL:', url);
@@ -770,10 +772,10 @@ async function handleScrapeTenders() {
             showError('scrape-error-message', 'Please navigate to an EstimateOne page first');
             return;
         }
-        
+
         showLoading();
         console.log('Sending scrape request...');
-        
+
         const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/scrapper/scrape-tenders`, {
             method: 'POST',
             headers: {
@@ -782,10 +784,10 @@ async function handleScrapeTenders() {
             },
             body: JSON.stringify({ url })
         });
-        
+
         const data = await response.json();
         console.log('Scrape response:', { status: response.status, data: data.status });
-        
+
         const user = await verifyToken(token);
         if (user) {
             showAuthenticatedUI(user);
@@ -793,13 +795,12 @@ async function handleScrapeTenders() {
             showLoginForm();
             return;
         }
-        
+
         if (response.ok && data.status === 'success') {
             showSuccess('scrape-success-message', data.message);
         } else {
             showError('scrape-error-message', data.detail || 'Scraping failed');
         }
-        
     } catch (error) {
         console.error('Scraping error:', error);
         
@@ -863,7 +864,7 @@ async function verifyToken(token) {
                 'Authorization': `Bearer ${token}`
             }
         });
-        
+
         if (response.ok) {
             const userData = await response.json();
             console.log('Token verification successful for:', userData.email);
@@ -871,7 +872,6 @@ async function verifyToken(token) {
         } else {
             console.log('Token verification failed:', response.status);
         }
-        
         return null;
     } catch (error) {
         console.error('Token verification error:', error);

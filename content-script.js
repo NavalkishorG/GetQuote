@@ -1,16 +1,12 @@
-// Enhanced Content Script for Multi-Page Project Selection with Persistence
 console.log('🚀 Enhanced Content script loaded');
 
 let selectedProjectIds = new Set();
 let allDetectedProjects = [];
 let overlayActive = false;
 let selectionSessionId = null;
-let currentPageProjects = [];
 
-// Initialize session on script load
 initializeSelectionSession();
 
-// Message listener for communication with popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('📨 Content script received message:', request.action);
     
@@ -26,26 +22,85 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'getSelectedProjects') {
         const selected = Array.from(selectedProjectIds);
         sendResponse({ success: true, selectedIds: selected });
-    } 
-    else if (request.action === 'checkPopupStatus') {
+    } else if (request.action === 'checkPopupStatus') {
         const popupStatus = checkIfPopupIsOpen();
         sendResponse({ success: true, popupStatus });
     } else if (request.action === 'getPopupProjectId') {
         const projectId = getProjectIdFromPopup();
         sendResponse({ success: true, projectId });
-    }
-    else if (request.action === 'storeSelectedIds') {
-        storeSelectedIdsViaBackground(request.selectedIds);
+    } else if (request.action === 'clearStoredSelection') {
+        clearStoredSelection();
         sendResponse({ success: true });
-    } else if (request.action === 'getStoredIds') {
-        getStoredIdsViaBackground((storedIds) => {
-            sendResponse({ success: true, selectedIds: storedIds || [] });
-        });
-        return true;
     }
+    
+    return true;
 });
 
-// Check if popup is currently open
+// Initialize or restore selection session
+async function initializeSelectionSession() {
+    try {
+        selectionSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Load previously selected IDs from Chrome storage
+        const storedIds = await loadSelectedIdsFromStorage();
+        selectedProjectIds = new Set(storedIds);
+        
+        console.log(`🆕 Session ${selectionSessionId} initialized with ${selectedProjectIds.size} stored IDs`);
+    } catch (error) {
+        console.error('❌ Error initializing session:', error);
+        selectedProjectIds = new Set();
+    }
+}
+
+// Storage management functions
+async function loadSelectedIdsFromStorage() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['selected_project_ids'], (result) => {
+            const stored = result.selected_project_ids || [];
+            console.log('📂 Loaded from storage:', stored);
+            resolve(stored);
+        });
+    });
+}
+
+async function saveSelectedIdsToStorage(selectedIds) {
+    return new Promise((resolve) => {
+        const idsArray = Array.from(selectedIds);
+        chrome.storage.local.set({ selected_project_ids: idsArray }, () => {
+            console.log('💾 Saved to storage:', idsArray);
+            resolve();
+        });
+    });
+}
+
+async function removeIdFromStorage(projectId) {
+    const currentIds = await loadSelectedIdsFromStorage();
+    const updatedIds = currentIds.filter(id => id !== projectId);
+    await saveSelectedIdsToStorage(new Set(updatedIds));
+    console.log('🗑️ Removed from storage:', projectId);
+}
+
+async function addIdToStorage(projectId) {
+    const currentIds = await loadSelectedIdsFromStorage();
+    const updatedIds = new Set([...currentIds, projectId]);
+    await saveSelectedIdsToStorage(updatedIds);
+    console.log('➕ Added to storage:', projectId);
+}
+
+function clearStoredSelection() {
+    chrome.storage.local.remove(['selected_project_ids'], () => {
+        selectedProjectIds.clear();
+        console.log('🧹 Cleared all stored selections');
+        
+        // Update visual indicators
+        document.querySelectorAll('.project-row-selected').forEach(row => {
+            row.classList.remove('project-row-selected');
+        });
+        updateOverlayStatus();
+    });
+}
+
+// Check if popup is open
 function checkIfPopupIsOpen() {
     const popupSelectors = [
         '.slide-pane__content',
@@ -54,7 +109,7 @@ function checkIfPopupIsOpen() {
         '.styles__slider__a65e8ea3f368640c502d',
         '.ReactModal__Overlay--after-open'
     ];
-    
+
     for (const selector of popupSelectors) {
         try {
             const element = document.querySelector(selector);
@@ -79,14 +134,13 @@ function checkIfPopupIsOpen() {
     return { isOpen: false };
 }
 
-// Get project ID from open popup
 function getProjectIdFromPopup() {
     const popupStatus = checkIfPopupIsOpen();
     if (!popupStatus.isOpen) {
         console.log('❌ No popup is open');
         return null;
     }
-    
+
     const popupContainer = popupStatus.element;
     const popupProjectIdSelectors = [
         'span.styles__projectId__f47058b1431204abe7ec',
@@ -94,7 +148,7 @@ function getProjectIdFromPopup() {
         '[class*="projectId"]',
         'span[title*="ID"]'
     ];
-    
+
     for (const selector of popupProjectIdSelectors) {
         try {
             const element = popupContainer.querySelector(selector);
@@ -113,7 +167,7 @@ function getProjectIdFromPopup() {
             continue;
         }
     }
-    
+
     try {
         const fullText = popupContainer.textContent || popupContainer.innerText;
         const idMatch = fullText.match(/ID\s*#?\s*(\d+)/i);
@@ -125,853 +179,424 @@ function getProjectIdFromPopup() {
     } catch (error) {
         console.warn('⚠️ Text-based fallback failed within popup:', error);
     }
-    
+
     console.log('❌ No project ID found within the open popup');
     return null;
 }
 
-// Storage functions via background script
-function storeSelectedIdsViaBackground(selectedIds) {
-    try {
-        chrome.runtime.sendMessage({
-            action: 'storeSelectedIds',
-            selectedIds: selectedIds
-        }, (response) => {
-            if (chrome.runtime.lastError) {
-                console.error('Storage message error:', chrome.runtime.lastError);
-                window.selectedProjectIds = selectedIds;
-            } else {
-                console.log('Selected IDs stored via background script');
-            }
-        });
-    } catch (error) {
-        console.error('Error sending storage message:', error);
-        window.selectedProjectIds = selectedIds;
-    }
-}
-
-function getStoredIdsViaBackground(callback) {
-    try {
-        chrome.runtime.sendMessage({
-            action: 'getStoredIds'
-        }, (response) => {
-            if (chrome.runtime.lastError) {
-                console.error('Retrieval message error:', chrome.runtime.lastError);
-                callback(window.selectedProjectIds || []);
-            } else {
-                callback(response.selectedIds || []);
-            }
-        });
-    } catch (error) {
-        console.error('Error getting stored IDs:', error);
-        callback(window.selectedProjectIds || []);
-    }
-}
-
-// Initialize session
-async function initializeSelectionSession() {
-    try {
-        selectionSessionId = generateSessionId();
-        selectedProjectIds = new Set();
-        console.log(`🆕 Created new session ${selectionSessionId}`);
-    } catch (error) {
-        console.error('❌ Error initializing session:', error);
-        selectionSessionId = generateSessionId();
-        selectedProjectIds = new Set();
-    }
-}
-
-function generateSessionId() {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-// UPDATED: Detect projects with multiple strategies for your HTML structure
+// Detect all projects on the current page
 function detectAllProjectsOnPage() {
     console.log('🔍 Detecting all projects on page...');
     const projects = [];
-    
-    // Strategy 1: Look for project IDs in element IDs and attributes (for your HTML structure)
+    const projectSelector = 'span.styles__projectId__a99146050623e131a1bf';
+
     try {
-        const projectIdElements = document.querySelectorAll('[id*="projectId_"], [for*="projectId_"]');
-        console.log(`Found ${projectIdElements.length} elements with projectId_ pattern`);
-        
-        const foundProjectIds = new Set();
-        
-        projectIdElements.forEach((element, index) => {
-            const idAttribute = element.getAttribute('id') || element.getAttribute('for') || '';
-            const projectIdMatch = idAttribute.match(/projectId[_-](\d+)/);
-            
-            if (projectIdMatch) {
-                const projectId = projectIdMatch[1];
-                
-                if (!foundProjectIds.has(projectId)) {
-                    foundProjectIds.add(projectId);
-                    
-                    const projectContainer = element.closest('tr, tbody, .project-row, [class*="project"]') || 
-                                           element.parentElement.parentElement.parentElement;
-                    
-                    const projectInfo = extractProjectInfo(projectContainer);
-                    
-                    projects.push({
-                        id: projectId,
-                        element: element,
-                        container: projectContainer,
-                        index: projects.length,
-                        isAlreadySelected: selectedProjectIds.has(projectId),
-                        ...projectInfo
-                    });
-                    
-                    console.log(`📋 Project ${projects.length}: ID ${projectId} ${selectedProjectIds.has(projectId) ? '(Already Selected)' : ''}`);
-                }
-            }
-        });
-    } catch (error) {
-        console.warn('⚠️ Strategy 1 failed:', error);
-    }
-    
-    // Strategy 2: Original selector as fallback
-    try {
-        const originalElements = document.querySelectorAll('span.styles__projectId__a99146050623e131a1bf');
-        console.log(`Found ${originalElements.length} elements with original selector`);
-        
-        originalElements.forEach((element, index) => {
+        const elements = document.querySelectorAll(projectSelector);
+        console.log(`Found ${elements.length} project elements`);
+
+        elements.forEach((element, index) => {
             const projectId = element.textContent?.trim().match(/(\d+)/)?.[1];
-            if (projectId && !projects.find(p => p.id === projectId)) {
+            if (projectId) {
                 const projectContainer = element.closest('[class*="project"], .card, [class*="item"]') || 
-                                       element.parentElement.parentElement;
+                                      element.parentElement.parentElement;
                 const projectInfo = extractProjectInfo(projectContainer);
                 
                 projects.push({
                     id: projectId,
                     element: element,
                     container: projectContainer,
-                    index: projects.length,
+                    index: index,
                     isAlreadySelected: selectedProjectIds.has(projectId),
                     ...projectInfo
                 });
                 
-                console.log(`📋 Project ${projects.length}: ID ${projectId} (from original selector)`);
+                console.log(`📋 Project ${index + 1}: ID ${projectId} ${selectedProjectIds.has(projectId) ? '(Already Selected)' : ''}`);
             }
         });
+
+        allDetectedProjects = projects;
+        console.log(`✅ Detected ${projects.length} projects total, ${Array.from(selectedProjectIds).length} already selected`);
+        
+        return projects.map(p => ({
+            id: p.id,
+            title: p.title,
+            deadline: p.deadline,
+            value: p.value,
+            trades: p.trades,
+            isAlreadySelected: p.isAlreadySelected
+        }));
+        
     } catch (error) {
-        console.warn('⚠️ Strategy 2 failed:', error);
+        console.error('❌ Error detecting projects:', error);
+        return [];
     }
-    
-    allDetectedProjects = projects;
-    currentPageProjects = projects;
-    console.log(`✅ Detected ${projects.length} projects total, ${Array.from(selectedProjectIds).length} already selected`);
-    
-    return projects.map(p => ({
-        id: p.id,
-        title: p.title,
-        deadline: p.deadline,
-        value: p.value,
-        trades: p.trades,
-        isAlreadySelected: p.isAlreadySelected
-    }));
 }
 
-// Enhanced project info extraction for your HTML structure  
+// Extract additional project information from container
 function extractProjectInfo(container) {
-    if (!container) return {
+    if (!container) return {};
+
+    const info = {
         title: 'Unknown Project',
         deadline: 'No deadline',
         value: 'No value',
         trades: 0
     };
-    
-    const info = {
-        title: 'Unknown Project',
-        deadline: 'No deadline', 
-        value: 'No value',
-        trades: 0
-    };
-    
+
     try {
-        const text = container.textContent || container.innerText || '';
-        
-        // Extract budget/value from your HTML structure
-        const budgetElement = container.querySelector('.styles__budgetRange__b101ae22d71fd54397d0, [class*="budget"], [class*="range"]');
-        if (budgetElement) {
-            info.value = budgetElement.textContent.trim();
-        } else {
-            const valueMatch = text.match(/\$[\d,.]+(M|K|k|m)?/i);
-            if (valueMatch) {
-                info.value = valueMatch[0];
-            }
-        }
-        
-        // Extract deadline from date elements
-        const dateElement = container.querySelector('.styles__projectDate__efdf1ddef6a4526d58ac, [class*="date"], [class*="deadline"]');
-        if (dateElement) {
-            info.deadline = dateElement.textContent.trim();
-        } else {
-            const deadlineMatch = text.match(/(\d{1,2}\s+\w{3}(?:\s+\d{2,4})?)/i);
-            if (deadlineMatch) {
-                info.deadline = deadlineMatch[1];
-            }
-        }
-        
-        // Extract title from various possible sources
         const titleSelectors = [
-            'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-            '[class*="title"]', '[class*="name"]', '[class*="project"]'
+            'h3', 'h4', 'h5', 
+            '[class*="title"]', 
+            '[class*="name"]', 
+            '.project-title'
         ];
-        
+
         for (const selector of titleSelectors) {
             const titleEl = container.querySelector(selector);
-            if (titleEl?.textContent?.trim() && titleEl.textContent.trim().length > 3) {
-                info.title = titleEl.textContent.trim().substring(0, 50);
-                if (info.title.length === 50) info.title += '...';
+            if (titleEl?.textContent?.trim()) {
+                info.title = titleEl.textContent.trim().substring(0, 50) + '...';
                 break;
             }
         }
-        
-        if (info.title === 'Unknown Project') {
-            const keywordElement = container.querySelector('span');
-            if (keywordElement?.textContent?.includes('Construction')) {
-                info.title = 'Construction Project';
-            }
+
+        const text = container.textContent || '';
+        const deadlineMatch = text.match(/closes?\s+in\s+(\d+)\s+days?/i) || 
+                             text.match(/deadline[:\s]*([^,\n]+)/i);
+        if (deadlineMatch) {
+            info.deadline = deadlineMatch[1];
         }
-        
-        const tradeElements = container.querySelectorAll('[class*="trade"], [class*="category"], [class*="builder"]');
+
+        const valueMatch = text.match(/\$[\d,.]+(M|K|k|m)?/i);
+        if (valueMatch) {
+            info.value = valueMatch[0];
+        }
+
+        const tradeElements = container.querySelectorAll('[class*="trade"], [class*="category"]');
         info.trades = tradeElements.length;
-        
+
     } catch (error) {
         console.warn('⚠️ Error extracting project info:', error);
     }
-    
+
     return info;
 }
 
-// FIXED: Show NON-BLOCKING overlay that allows page interaction
+// Show enhanced visual selection overlay with persistence
 function showProjectSelectionOverlay() {
-    if (overlayActive) {
-        console.log('⚠️ Overlay already active, refreshing instead of recreating...');
-        refreshCurrentPageWithOverlay();
-        return;
-    }
+    if (overlayActive) return;
     
-    console.log('👁️ Showing non-blocking selection overlay...');
+    console.log('👁️ Showing enhanced selection overlay...');
     overlayActive = true;
-    
-    // Create HEADER-ONLY overlay (not full screen)
+
+    // Remove existing overlay if any
+    const existingOverlay = document.getElementById('project-selection-overlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+
+    // Create overlay container
     const overlay = document.createElement('div');
     overlay.id = 'project-selection-overlay';
     overlay.innerHTML = `
+        <style>
+            #project-selection-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 15px;
+                z-index: 10000;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                border-bottom: 3px solid #4CAF50;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            
+            .selection-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            
+            .selection-title {
+                font-size: 18px;
+                font-weight: bold;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .selection-controls {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+            
+            .selection-button {
+                padding: 8px 16px;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: bold;
+                font-size: 14px;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            
+            .confirm-btn {
+                background: #4CAF50;
+                color: white;
+            }
+            
+            .confirm-btn:hover {
+                background: #45a049;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+            
+            .confirm-btn:disabled {
+                background: #cccccc;
+                cursor: not-allowed;
+                transform: none;
+            }
+            
+            .clear-btn {
+                background: #f44336;
+                color: white;
+            }
+            
+            .clear-btn:hover {
+                background: #da190b;
+            }
+            
+            .close-btn {
+                background: #6c757d;
+                color: white;
+                padding: 6px 12px;
+            }
+            
+            .close-btn:hover {
+                background: #545b62;
+            }
+            
+            .selection-info {
+                background: rgba(255,255,255,0.2);
+                padding: 10px;
+                border-radius: 6px;
+                margin-top: 10px;
+                backdrop-filter: blur(10px);
+            }
+            
+            .project-row-selected {
+                background: linear-gradient(90deg, #4CAF50, #45a049) !important;
+                transform: scale(1.02) !important;
+                box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4) !important;
+                border: 2px solid #4CAF50 !important;
+                border-radius: 8px !important;
+                transition: all 0.3s ease !important;
+            }
+            
+            .project-row-selected * {
+                color: white !important;
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+            }
+            
+            .status-indicator {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 4px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            
+            .status-ready {
+                background: #4CAF50;
+                color: white;
+            }
+            
+            .status-waiting {
+                background: #ff9800;
+                color: white;
+            }
+        </style>
+        
         <div class="selection-header">
-            <h3>🎯 Multi-Page Project Selection</h3>
-            <div class="selection-status">
-                <span id="selection-count">${selectedProjectIds.size} projects selected across all pages</span><br>
-                <span id="current-page-count">0 projects on current page</span>
+            <div class="selection-title">
+                🎯 Project Selection Mode
+                <span id="selection-status" class="status-indicator status-waiting">
+                    ⏳ 0 Selected
+                </span>
             </div>
+            
             <div class="selection-controls">
-                <button id="refresh-projects-btn" class="refresh-btn">🔄 Refresh</button>
-                <button id="select-all-btn">✅ Select All</button>
-                <button id="clear-all-btn">❌ Clear All</button>
-                <button id="view-selected-btn">👁️ View Selected</button>
-                <button id="confirm-selection-btn" ${selectedProjectIds.size === 0 ? 'disabled' : ''}>
-                    ✔️ Confirm & Process ${selectedProjectIds.size} Selected
+                <button id="confirm-process-btn" class="selection-button confirm-btn" disabled>
+                    🚀 Confirm & Process
                 </button>
-                <button id="cancel-selection-btn">❌ Cancel</button>
+                <button id="clear-selection-btn" class="selection-button clear-btn">
+                    🧹 Clear All
+                </button>
+                <button id="close-overlay-btn" class="selection-button close-btn">
+                    ❌ Close
+                </button>
             </div>
         </div>
+        
+        <div class="selection-info">
+            📋 Click on project rows to select/deselect them. Selected projects are saved automatically and will be processed when you click "Confirm & Process".
+        </div>
     `;
-    
-    // FIXED: Non-blocking CSS - NO full screen background, NO pointer-events blocking
-    const style = document.createElement('style');
-    style.textContent = `
-        #project-selection-overlay {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            z-index: 999999 !important;
-            padding: 10px !important;
-            pointer-events: none !important; /* KEY FIX: Overlay itself doesn't block clicks */
-        }
-        
-        .selection-header {
-            background: rgba(255, 255, 255, 0.98) !important;
-            padding: 15px !important;
-            border-radius: 10px !important;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2) !important;
-            text-align: center !important;
-            border: 2px solid #007bff !important;
-            pointer-events: auto !important; /* Only the header captures clicks */
-            backdrop-filter: blur(3px) !important;
-        }
-        
-        .selection-header h3 {
-            margin: 0 0 10px 0 !important;
-            color: #007bff !important;
-            font-size: 16px !important;
-        }
-        
-        .selection-status {
-            margin: 10px 0 !important;
-            font-size: 13px !important;
-            color: #666 !important;
-        }
-        
-        .selection-controls {
-            display: flex !important;
-            gap: 8px !important;
-            justify-content: center !important;
-            flex-wrap: wrap !important;
-            margin-top: 15px !important;
-        }
-        
-        .selection-controls button {
-            padding: 8px 12px !important;
-            border: none !important;
-            border-radius: 6px !important;
-            cursor: pointer !important;
-            font-weight: bold !important;
-            font-size: 12px !important;
-            transition: all 0.3s !important;
-            white-space: nowrap !important;
-        }
-        
-        .refresh-btn { background: #17a2b8 !important; color: white !important; }
-        .refresh-btn:hover { background: #138496 !important; }
-        
-        #select-all-btn { background: #28a745 !important; color: white !important; }
-        #select-all-btn:hover { background: #218838 !important; }
-        
-        #clear-all-btn { background: #dc3545 !important; color: white !important; }
-        #clear-all-btn:hover { background: #c82333 !important; }
-        
-        #view-selected-btn { background: #6f42c1 !important; color: white !important; }
-        #view-selected-btn:hover { background: #5a32a3 !important; }
-        
-        #confirm-selection-btn { background: #28a745 !important; color: white !important; }
-        #confirm-selection-btn:hover:not(:disabled) { background: #218838 !important; }
-        #confirm-selection-btn:disabled { background: #ccc !important; cursor: not-allowed !important; }
-        
-        #cancel-selection-btn { background: #6c757d !important; color: white !important; }
-        #cancel-selection-btn:hover { background: #545b62 !important; }
-        
-        /* Project row highlighting - DIRECT on existing elements */
-        .project-row-selectable {
-            position: relative !important;
-            transition: all 0.3s ease !important;
-            cursor: pointer !important;
-        }
-        
-        .project-row-selectable:hover {
-            background-color: rgba(0, 123, 255, 0.08) !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15) !important;
-        }
-        
-        .project-row-selectable.selected {
-            background-color: rgba(40, 167, 69, 0.12) !important;
-            border-left: 4px solid #28a745 !important;
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.25) !important;
-        }
-        
-        .project-row-selectable.selected:hover {
-            background-color: rgba(40, 167, 69, 0.18) !important;
-        }
-        
-        /* Selection badge */
-        .selection-badge {
-            position: absolute !important;
-            top: 5px !important;
-            right: 5px !important;
-            background: #28a745 !important;
-            color: white !important;
-            padding: 3px 8px !important;
-            border-radius: 10px !important;
-            font-size: 10px !important;
-            font-weight: bold !important;
-            z-index: 1000 !important;
-            pointer-events: none !important;
-        }
-        
-        /* Ensure dropdowns and interactive elements remain functional */
-        .interestLevelDropdown, 
-        [role="combobox"],
-        .reactSelect__control,
-        input, button, a, select {
-            pointer-events: auto !important;
-            position: relative !important;
-            z-index: 1001 !important;
-        }
-    `;
-    
-    document.head.appendChild(style);
+
     document.body.appendChild(overlay);
-    
+
     // Attach event listeners
-    attachOverlayEventListeners();
+    document.getElementById('confirm-process-btn').addEventListener('click', handleConfirmProcess);
+    document.getElementById('clear-selection-btn').addEventListener('click', handleClearSelection);
+    document.getElementById('close-overlay-btn').addEventListener('click', hideProjectSelectionOverlay);
+
+    // Add click handlers to project rows
+    attachProjectRowClickHandlers();
     
-    // Make project rows selectable DIRECTLY (no floating indicators)
-    makeProjectRowsSelectable();
+    // Update initial status
+    updateOverlayStatus();
     
-    // Update counter
-    updateSelectionCounter();
-    
-    // Set up persistent page change detection
-    setupPageChangeDetection();
+    console.log('✅ Selection overlay displayed successfully');
 }
 
-// FIXED: Make project rows directly selectable without floating indicators
-function makeProjectRowsSelectable() {
-    // Remove existing selection classes
-    document.querySelectorAll('.project-row-selectable').forEach(el => {
-        el.classList.remove('project-row-selectable', 'selected');
-    });
-    document.querySelectorAll('.selection-badge').forEach(el => el.remove());
+// Update overlay status display
+function updateOverlayStatus() {
+    const statusElement = document.getElementById('selection-status');
+    const confirmButton = document.getElementById('confirm-process-btn');
     
-    const projects = detectAllProjectsOnPage();
-    console.log(`🎯 Making ${projects.length} project rows selectable...`);
+    if (!statusElement || !confirmButton) return;
     
-    projects.forEach((project) => {
-        // Find the table row containing this project
-        let projectRow = null;
-        
-        if (project.container) {
-            projectRow = project.container.closest('tr') || project.container;
-        } else if (project.element) {
-            projectRow = project.element.closest('tr, tbody, [class*="project"], [class*="tender"]');
-        }
-        
-        // Fallback: Look for tr containing the project ID
-        if (!projectRow) {
-            const allRows = document.querySelectorAll('tr, tbody');
-            for (const row of allRows) {
-                if (row.innerHTML.includes(project.id)) {
-                    projectRow = row;
-                    break;
-                }
-            }
-        }
-        
-        if (projectRow) {
-            console.log(`✅ Found row for project ${project.id}`);
-            
-            // Make row selectable
-            projectRow.classList.add('project-row-selectable');
-            projectRow.setAttribute('data-project-id', project.id);
-            
-            // Add selection state
-            if (selectedProjectIds.has(project.id)) {
-                projectRow.classList.add('selected');
-                
-                // Add selected badge
-                const badge = document.createElement('div');
-                badge.className = 'selection-badge';
-                badge.textContent = '✅ SELECTED';
-                projectRow.style.position = 'relative';
-                projectRow.appendChild(badge);
-            }
-            
-            // Add click handler with event delegation
-            const clickHandler = (e) => {
-                // Prevent interfering with dropdowns, links, buttons
-                if (e.target.tagName === 'A' || 
-                    e.target.tagName === 'BUTTON' || 
-                    e.target.tagName === 'INPUT' || 
-                    e.target.tagName === 'SELECT' ||
-                    e.target.closest('.interestLevelDropdown') ||
-                    e.target.closest('[role="combobox"]')) {
-                    return; // Allow normal interaction
-                }
-                
-                e.preventDefault();
-                e.stopPropagation();
-                toggleProjectSelection(project.id, projectRow);
-            };
-            
-            // Remove existing listeners to prevent duplicates
-            projectRow.removeEventListener('click', clickHandler);
-            // Add new listener
-            projectRow.addEventListener('click', clickHandler);
-        } else {
-            console.warn(`⚠️ Could not find row for project ${project.id}`);
-        }
-    });
+    const selectedCount = selectedProjectIds.size;
     
-    updateCurrentPageCount();
+    if (selectedCount > 0) {
+        statusElement.textContent = `✅ ${selectedCount} Selected`;
+        statusElement.className = 'status-indicator status-ready';
+        confirmButton.disabled = false;
+    } else {
+        statusElement.textContent = '⏳ 0 Selected';
+        statusElement.className = 'status-indicator status-waiting';
+        confirmButton.disabled = true;
+    }
 }
 
-// Toggle project selection
-function toggleProjectSelection(projectId, rowElement) {
+// Handle confirm and process button click
+async function handleConfirmProcess() {
+    const selectedIds = Array.from(selectedProjectIds);
+    
+    if (selectedIds.length === 0) {
+        alert('No projects selected!');
+        return;
+    }
+
+    console.log('🚀 Confirm & Process clicked with IDs:', selectedIds);
+    
+    // Send message to popup to process these IDs immediately
+    chrome.runtime.sendMessage({
+        action: 'processSelectedProjectsNow',
+        selectedIds: selectedIds
+    });
+    
+    // Hide overlay
+    hideProjectSelectionOverlay();
+}
+
+// Handle clear selection
+async function handleClearSelection() {
+    selectedProjectIds.clear();
+    await saveSelectedIdsToStorage(selectedProjectIds);
+    
+    // Remove visual indicators
+    document.querySelectorAll('.project-row-selected').forEach(row => {
+        row.classList.remove('project-row-selected');
+    });
+    
+    updateOverlayStatus();
+    console.log('🧹 All selections cleared');
+}
+
+// Attach click handlers to project rows
+function attachProjectRowClickHandlers() {
+    const projectRows = document.querySelectorAll('tbody.styles__tenderRow__b2e48989c7e9117bd552');
+    
+    console.log(`🔗 Attaching click handlers to ${projectRows.length} project rows`);
+    
+    projectRows.forEach((row, index) => {
+        const projectIdElement = row.querySelector('.styles__projectId__a99146050623e131a1bf');
+        
+        if (projectIdElement) {
+            const projectId = projectIdElement.textContent?.trim().match(/(\d+)/)?.[1];
+            
+            if (projectId) {
+                // Check if already selected and apply visual indicator
+                if (selectedProjectIds.has(projectId)) {
+                    row.classList.add('project-row-selected');
+                }
+                
+                // Remove existing click handlers
+                const newRow = row.cloneNode(true);
+                row.parentNode.replaceChild(newRow, row);
+                
+                // Add new click handler
+                newRow.addEventListener('click', async (event) => {
+                    // Prevent default link clicks
+                    event.preventDefault();
+                    event.stopPropagation();
+                    
+                    await handleProjectRowClick(projectId, newRow);
+                });
+                
+                console.log(`✅ Click handler attached to project ${projectId}`);
+            }
+        }
+    });
+}
+
+// Handle project row click for selection
+async function handleProjectRowClick(projectId, rowElement) {
+    console.log(`🖱️ Project row clicked: ${projectId}`);
+    
     if (selectedProjectIds.has(projectId)) {
         // Deselect
         selectedProjectIds.delete(projectId);
-        rowElement.classList.remove('selected');
-        const badge = rowElement.querySelector('.selection-badge');
-        if (badge) badge.remove();
+        rowElement.classList.remove('project-row-selected');
+        await removeIdFromStorage(projectId);
         console.log(`➖ Deselected project: ${projectId}`);
     } else {
         // Select
         selectedProjectIds.add(projectId);
-        rowElement.classList.add('selected');
-        
-        // Add badge
-        let badge = rowElement.querySelector('.selection-badge');
-        if (!badge) {
-            badge = document.createElement('div');
-            badge.className = 'selection-badge';
-            badge.textContent = '✅ SELECTED';
-            rowElement.style.position = 'relative';
-            rowElement.appendChild(badge);
-        }
+        rowElement.classList.add('project-row-selected');
+        await addIdToStorage(projectId);
         console.log(`➕ Selected project: ${projectId}`);
     }
     
-    updateSelectionCounter();
-    updateCurrentPageCount();
+    updateOverlayStatus();
     
-    // Store selections
-    storeSelectedIdsViaBackground(Array.from(selectedProjectIds));
-}
-
-// Attach event listeners to overlay buttons
-function attachOverlayEventListeners() {
-    const confirmBtn = document.getElementById('confirm-selection-btn');
-    const clearBtn = document.getElementById('clear-all-btn');
-    const cancelBtn = document.getElementById('cancel-selection-btn');
-    const selectAllBtn = document.getElementById('select-all-btn');
-    const refreshBtn = document.getElementById('refresh-projects-btn');
-    const viewSelectedBtn = document.getElementById('view-selected-btn');
-    
-    if (confirmBtn) {
-        confirmBtn.addEventListener('click', handleConfirmSelection);
-    }
-    
-    if (clearBtn) {
-        clearBtn.addEventListener('click', clearAllSelections);
-    }
-    
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', hideProjectSelectionOverlay);
-    }
-    
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', selectAllOnCurrentPage);
-    }
-    
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', refreshCurrentPage);
-    }
-    
-    if (viewSelectedBtn) {
-        viewSelectedBtn.addEventListener('click', showSelectedProjectsList);
-    }
-}
-
-// Select all projects on current page
-function selectAllOnCurrentPage() {
-    console.log('🎯 Selecting all projects on current page...');
-    
-    currentPageProjects.forEach(project => {
-        if (!selectedProjectIds.has(project.id)) {
-            selectedProjectIds.add(project.id);
-        }
-    });
-    
-    makeProjectRowsSelectable();
-    updateSelectionCounter();
-    updateCurrentPageCount();
-    
-    storeSelectedIdsViaBackground(Array.from(selectedProjectIds));
-    
-    console.log(`✅ Selected all ${currentPageProjects.length} projects on current page`);
-}
-
-// Refresh current page projects
-function refreshCurrentPage() {
-    console.log('🔄 Refreshing current page projects...');
-    
-    const projects = detectAllProjectsOnPage();
-    makeProjectRowsSelectable();
-    updateSelectionCounter();
-    updateCurrentPageCount();
-    
-    console.log(`✅ Refreshed page - found ${projects.length} projects`);
-}
-
-// NEW: Refresh current page while maintaining overlay
-function refreshCurrentPageWithOverlay() {
-    console.log('🔄 Refreshing current page while maintaining overlay...');
-    
-    // Don't recreate overlay, just refresh the projects
-    const projects = detectAllProjectsOnPage();
-    makeProjectRowsSelectable();
-    updateSelectionCounter();
-    updateCurrentPageCount();
-    
-    console.log(`✅ Page refreshed with overlay maintained - found ${projects.length} projects`);
-    
-    // Show notification to user
-    showNotification(`🔄 Page refreshed - found ${projects.length} projects. ${selectedProjectIds.size} total selected.`, 'info');
-}
-
-// Show list of selected projects
-function showSelectedProjectsList() {
-    const selectedList = Array.from(selectedProjectIds);
-    
-    if (selectedList.length === 0) {
-        alert('No projects selected yet.');
-        return;
-    }
-    
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-        position: fixed !important;
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) !important;
-        background: white !important;
-        padding: 20px !important;
-        border-radius: 10px !important;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3) !important;
-        z-index: 1000000 !important;
-        max-width: 80% !important;
-        max-height: 80% !important;
-        overflow: auto !important;
-        pointer-events: auto !important;
-    `;
-    
-    modal.innerHTML = `
-        <h3>Selected Projects (${selectedList.length})</h3>
-        <div style="max-height: 300px; overflow-y: auto; margin: 10px 0;">
-            ${selectedList.map(id => `<div style="padding: 5px; border-bottom: 1px solid #eee;">Project ID: ${id}</div>`).join('')}
-        </div>
-        <button id="close-modal" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    document.getElementById('close-modal').addEventListener('click', () => {
-        modal.remove();
-    });
-}
-
-// FIXED: Handle confirm button click - Now processes projects immediately
-function handleConfirmSelection() {
-    const selectedIds = Array.from(selectedProjectIds);
-    
-    if (selectedIds.length === 0) {
-        alert('Please select at least one project');
-        return;
-    }
-    
-    console.log('📤 Confirm button clicked - Processing selected project IDs:', selectedIds);
-    
-    // Store selected IDs
-    storeSelectedIdsViaBackground(selectedIds);
-    
-    // NEW: Send message to popup to actually process the projects
-    chrome.runtime.sendMessage({
-        action: 'processSelectedProjectsNow', // New action for immediate processing
-        selectedIds: selectedIds
-    }, (response) => {
-        if (chrome.runtime.lastError) {
-            console.error('Message send error:', chrome.runtime.lastError);
-            // Fallback: store in DOM
-            window.selectedProjectIds = selectedIds;
-        } else {
-            console.log('✅ Projects sent for processing');
-        }
-    });
-    
-    // Hide overlay after sending for processing
-    hideProjectSelectionOverlay();
-}
-
-// Update selection counter
-function updateSelectionCounter() {
-    const countElement = document.getElementById('selection-count');
-    const confirmBtn = document.getElementById('confirm-selection-btn');
-    
-    const count = selectedProjectIds.size;
-    
-    if (countElement) {
-        countElement.textContent = `${count} projects selected across all pages`;
-    }
-    
-    if (confirmBtn) {
-        confirmBtn.disabled = count === 0;
-        confirmBtn.innerHTML = `✔️ Confirm & Process ${count} Selected`;
-    }
-}
-
-// Update current page count
-function updateCurrentPageCount() {
-    const countElement = document.getElementById('current-page-count');
-    const currentPageSelected = currentPageProjects.filter(p => selectedProjectIds.has(p.id)).length;
-    
-    if (countElement) {
-        countElement.textContent = `${currentPageSelected}/${currentPageProjects.length} projects selected on current page`;
-    }
-}
-
-// Clear all selections
-function clearAllSelections() {
-    console.log('🗑️ Clearing all selections...');
-    
-    selectedProjectIds.clear();
-    
-    makeProjectRowsSelectable();
-    updateSelectionCounter();
-    updateCurrentPageCount();
-    
-    storeSelectedIdsViaBackground([]);
-    
-    console.log('✅ All selections cleared');
+    // Flash effect for feedback
+    rowElement.style.transition = 'all 0.3s ease';
+    rowElement.style.transform = 'scale(1.05)';
+    setTimeout(() => {
+        rowElement.style.transform = '';
+    }, 200);
 }
 
 // Hide project selection overlay
 function hideProjectSelectionOverlay() {
-    console.log('👁️ Selection overlay hidden');
+    console.log('🙈 Hiding selection overlay...');
     
     const overlay = document.getElementById('project-selection-overlay');
     if (overlay) {
         overlay.remove();
     }
     
-    // Remove selection classes from project rows
-    document.querySelectorAll('.project-row-selectable').forEach(el => {
-        el.classList.remove('project-row-selectable', 'selected');
-    });
-    document.querySelectorAll('.selection-badge').forEach(el => el.remove());
-    
     overlayActive = false;
-    
-    // Clean up page change observer
-    if (window.pageChangeObserver) {
-        window.pageChangeObserver.disconnect();
-        window.pageChangeObserver = null;
-    }
+    console.log('✅ Selection overlay hidden');
 }
-
-// FIXED: Enhanced setup for page change detection with overlay persistence
-function setupPageChangeDetection() {
-    if (window.pageChangeObserver) {
-        window.pageChangeObserver.disconnect();
-    }
-    
-    let currentUrl = window.location.href;
-    
-    const checkUrlChange = () => {
-        if (window.location.href !== currentUrl) {
-            console.log('🔄 Page URL changed, maintaining overlay...');
-            const previousUrl = currentUrl;
-            currentUrl = window.location.href;
-            
-            // Small delay to let new content load
-            setTimeout(() => {
-                if (overlayActive) {
-                    console.log('✅ Overlay was active, maintaining it on new page...');
-                    
-                    // Re-detect projects on new page while keeping overlay
-                    refreshCurrentPageWithOverlay();
-                } else {
-                    console.log('❌ Overlay was not active, not showing on new page');
-                }
-            }, 1500); // Increased delay for EstimateOne page loads
-        }
-    };
-    
-    // Check URL changes every 500ms for faster detection
-    const urlCheckInterval = setInterval(checkUrlChange, 500);
-    
-    // Enhanced DOM change detection
-    window.pageChangeObserver = new MutationObserver((mutations) => {
-        let shouldRefresh = false;
-        
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'childList') {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === 1) {
-                        // Check for project elements or page content changes
-                        if (node.querySelector && (
-                            node.querySelector('span.styles__projectId__a99146050623e131a1bf') || 
-                            node.querySelector('[id*="projectId_"]') ||
-                            node.querySelector('tbody') ||
-                            node.querySelector('.styles__tenderRow__b2e48989c7e9117bd552')
-                        )) {
-                            shouldRefresh = true;
-                        }
-                    }
-                });
-            }
-        });
-        
-        if (shouldRefresh && overlayActive) {
-            console.log('🔄 DOM changed, refreshing project selection while maintaining overlay...');
-            clearTimeout(window.refreshTimeout);
-            window.refreshTimeout = setTimeout(() => {
-                refreshCurrentPageWithOverlay();
-            }, 800); // Slightly longer delay for DOM stability
-        }
-    });
-    
-    // Observe with more comprehensive settings
-    window.pageChangeObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: false, // Don't watch attributes to reduce noise
-        characterData: false // Don't watch text changes
-    });
-    
-    // Enhanced cleanup
-    window.addEventListener('beforeunload', () => {
-        clearInterval(urlCheckInterval);
-        if (window.pageChangeObserver) {
-            window.pageChangeObserver.disconnect();
-        }
-    });
-}
-
-// NEW: Show notification to user
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.textContent = message;
-    
-    const colors = {
-        success: '#4caf50',
-        error: '#f44336',
-        info: '#2196f3',
-        warning: '#ff9800'
-    };
-    
-    Object.assign(notification.style, {
-        position: 'fixed',
-        top: '80px', // Below the overlay header
-        right: '20px',
-        background: colors[type] || colors.info,
-        color: 'white',
-        padding: '12px 20px',
-        borderRadius: '8px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        zIndex: '1000001',
-        fontSize: '14px',
-        fontWeight: '600',
-        maxWidth: '300px',
-        wordWrap: 'break-word'
-    });
-    
-    document.body.appendChild(notification);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
-        }
-    }, 3000);
-}
-
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-    if (overlayActive) {
-        hideProjectSelectionOverlay();
-    }
-});
-
-console.log('✅ Enhanced content script loaded with non-blocking overlay support');
