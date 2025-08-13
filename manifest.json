@@ -21,8 +21,8 @@
   "content_scripts": [
     {
       "matches": ["https://estimateone.com/*", "https://*.estimateone.com/*"],
-      "js": ["content-script.js"],
-      "css": ["project-selector.css"],
+      "js": ["config.js", "content-script.js"],
+      "css": ["content.css"],
       "run_at": "document_end"
     }
   ],
@@ -36,7 +36,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["popup.html", "config.js", "dashboard.html", "project-selector.css"],
+      "resources": ["popup.html", "config.js", "dashboard.html", "content.css"],
       "matches": ["<all_urls>"]
     }
   ],

@@ -5,14 +5,10 @@ let allDetectedProjects = [];
 let overlayActive = false;
 let selectionSessionId = null;
 
-// Extension configuration - replace with your actual API URL
-const EXTENSION_CONFIG = {
-    API_BASE_URL: 'http://localhost:8000', // Replace with your actual backend URL
-    getRequestHeaders: () => ({
-        'Content-Type': 'application/json'
-    })
-};
+// Initialize extension config access
+const EXTENSION_CONFIG = window.ExtensionConfig;
 
+// Initialize selection session on load
 initializeSelectionSession();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -315,151 +311,7 @@ function showProjectSelectionOverlay() {
     const overlay = document.createElement('div');
     overlay.id = 'project-selection-overlay';
     overlay.innerHTML = `
-        <style>
-            #project-selection-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 15px;
-                z-index: 10000;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-                border-bottom: 3px solid #4CAF50;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            }
-            
-            .selection-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 10px;
-            }
-            
-            .selection-title {
-                font-size: 18px;
-                font-weight: bold;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            
-            .selection-controls {
-                display: flex;
-                gap: 10px;
-                align-items: center;
-            }
-            
-            .selection-button {
-                padding: 8px 16px;
-                border: none;
-                border-radius: 6px;
-                cursor: pointer;
-                font-weight: bold;
-                font-size: 14px;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-            
-            .confirm-btn {
-                background: #4CAF50;
-                color: white;
-            }
-            
-            .confirm-btn:hover {
-                background: #45a049;
-                transform: translateY(-1px);
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            }
-            
-            .confirm-btn:disabled {
-                background: #cccccc;
-                cursor: not-allowed;
-                transform: none;
-            }
-            
-            .confirm-btn.processing {
-                background: #ff9800;
-                cursor: not-allowed;
-            }
-            
-            .clear-btn {
-                background: #f44336;
-                color: white;
-            }
-            
-            .clear-btn:hover {
-                background: #da190b;
-            }
-            
-            .close-btn {
-                background: #6c757d;
-                color: white;
-                padding: 6px 12px;
-            }
-            
-            .close-btn:hover {
-                background: #545b62;
-            }
-            
-            .selection-info {
-                background: rgba(255,255,255,0.2);
-                padding: 10px;
-                border-radius: 6px;
-                margin-top: 10px;
-                backdrop-filter: blur(10px);
-            }
-            
-            .project-row-selected {
-                background: linear-gradient(90deg, #4CAF50, #45a049) !important;
-                transform: scale(1.02) !important;
-                box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4) !important;
-                border: 2px solid #4CAF50 !important;
-                border-radius: 8px !important;
-                transition: all 0.3s ease !important;
-            }
-            
-            .project-row-selected * {
-                color: white !important;
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
-            }
-            
-            .status-indicator {
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-                padding: 4px 8px;
-                border-radius: 12px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            
-            .status-ready {
-                background: #4CAF50;
-                color: white;
-            }
-            
-            .status-waiting {
-                background: #ff9800;
-                color: white;
-            }
-            
-            .status-processing {
-                background: #2196F3;
-                color: white;
-                animation: pulse 1.5s infinite;
-            }
-            
-            @keyframes pulse {
-                0% { opacity: 1; }
-                50% { opacity: 0.5; }
-                100% { opacity: 1; }
-            }
-        </style>
-        
+    
         <div class="selection-header">
             <div class="selection-title">
                 🎯 Project Selection Mode
@@ -562,11 +414,11 @@ async function handleConfirmProcess() {
 
         console.log('📤 Making direct API call to backend...');
         
-        // DIRECT API CALL to backend
-        const response = await fetch(`${EXTENSION_CONFIG.API_BASE_URL}/scrapper/scrape-project`, {
+        // DIRECT API CALL to backend - FIXED: Using window.ExtensionConfig
+        const response = await fetch(`${window.ExtensionConfig.API_BASE_URL}/scrapper/scrape-project`, {
             method: 'POST',
             headers: {
-                ...EXTENSION_CONFIG.getRequestHeaders(),
+                ...window.ExtensionConfig.getRequestHeaders(),
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
