@@ -7,11 +7,11 @@ const Environment = {
   };
   
   // Set this to switch between environments
-  const CURRENT_ENV = Environment.LOCAL; // Change this as needed
+  const CURRENT_ENV = Environment.NGROK; // Change this as needed
   
   const API_URLS = {
     [Environment.LOCAL]: 'http://localhost:8000',
-    [Environment.NGROK]: 'https://89c7a4d14810.ngrok-free.app', // Replace with your ngrok URL
+    [Environment.NGROK]: 'https://d52894ddbca8.ngrok-free.app', // Replace with your ngrok URL
     [Environment.PRODUCTION]: 'http://localhost:8000' // Replace with your production URL
   };
   
